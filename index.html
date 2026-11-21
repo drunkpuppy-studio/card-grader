@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F2F3EF">
+<title>PreGrade Card Grader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Fixed light palette: grading-bench paper, slab ink, cobalt instrument accent, card-border yellow for the guide */
+  --paper: #F2F3EF; --card: #FFFFFF; --ink: #14171D; --muted: #586070; --line: #D8DBD3;
+  --accent: #1F3FD1; --accent-ink: #FFFFFF; --volt: #F2C531;
+  --good: #1B8A4B; --warn: #A86400; --bad: #C2312A;
+  --display: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
+  --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* layout: one phone-width column; each step is a view that replaces the last */
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+button, input, label { font: inherit; }
+.app { max-width: 560px; margin: 0 auto; padding: 0 16px 48px; display: flex; flex-direction: column; gap: 18px; }
+header.top.inflow .brand span { display: none; }
+header.top { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 6px; gap: 12px; }
+.brand { display: flex; align-items: baseline; gap: 10px; cursor: pointer; background: none; border: 0; padding: 0; color: inherit; }
+.brand b { font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: 22px; letter-spacing: -0.01em; }
+.brand span { font-size: 12px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.steps { display: flex; gap: 6px; font-size: 12px; color: var(--muted); }
+.steps i { font-style: normal; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); background: var(--card); }
+.steps i.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.steps i.done { color: var(--good); border-color: #B9DCC7; }
+h1, h2, h3 { font-family: var(--display); font-stretch: 100%; margin: 0; text-wrap: balance; line-height: 1.15; }
+h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.015em; }
+h2 { font-size: 19px; font-weight: 700; }
+h3 { font-size: 15px; font-weight: 700; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn { appearance: none; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; padding: 11px 16px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+.btn:hover { border-color: #B9BDB3; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { background: #1834B3; }
+.btn.block { width: 100%; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--accent); padding-left: 6px; padding-right: 6px; }
+.btn:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 3px solid #8FA2F5; outline-offset: 2px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+tr:last-child td { border-bottom: 0; }
+.tablewrap { overflow-x: auto; }
+.grade { font-family: var(--mono); font-weight: 600; white-space: nowrap; }
+.co { font-family: var(--display); font-weight: 800; font-stretch: 110%; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--line); background: var(--card); white-space: nowrap; }
+.pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.pill.ok { color: var(--good); border-color: #BFE0CC; } .pill.ok::before { background: var(--good); }
+.pill.warn { color: var(--warn); border-color: #EBD2A8; } .pill.warn::before { background: var(--warn); }
+.pill.bad { color: var(--bad); border-color: #EDC0BC; } .pill.bad::before { background: var(--bad); }
+.notes { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.notes li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; padding: 9px 11px; border-radius: 10px; border-left: 4px solid var(--muted); background: #F6F7F4; }
+.notes li.warn { border-color: var(--warn); background: #FBF5EA; }
+.notes li.bad { border-color: var(--bad); background: #FBEFEE; }
+.notes li.ok { border-color: var(--good); background: #EFF7F2; }
+
+/* home */
+.hero { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+.hero .slab { width: 92px; aspect-ratio: 63/104; border-radius: 8px; border: 2px solid var(--ink); background: linear-gradient(#fff 0 18%, var(--paper) 18%); position: relative; }
+.hero .slab::before { content: 'PSA 10?'; position: absolute; top: 3%; left: 8%; font: 700 10px var(--mono); }
+.hero .slab::after { content: ''; position: absolute; left: 12%; right: 12%; top: 25%; bottom: 6%; border-radius: 4px; border: 5px solid var(--volt); background: #7BB28A; }
+.how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.how div { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.how b { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+@media (max-width: 420px) { .how { grid-template-columns: 1fr; } }
+.hist { display: flex; flex-direction: column; gap: 10px; }
+.hitem { display: grid; grid-template-columns: 46px 1fr auto; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); text-align: left; width: 100%; color: inherit; }
+button.hitem { cursor: pointer; }
+.hitem img, .hitem canvas { width: 46px; height: 64px; object-fit: cover; border-radius: 4px; background: #ddd; }
+.hitem .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.chip { font: 600 11px var(--mono); padding: 1px 6px; border-radius: 5px; background: #EEF0FB; color: #22339A; }
+.tag-ex { font: 600 10.5px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--warn); }
+
+/* capture */
+.stage { position: relative; width: 100%; aspect-ratio: 3/4; background: #1A1D22; border-radius: 16px; overflow: hidden; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage .say { position: absolute; left: 12px; right: 12px; bottom: 12px; text-align: center; color: #fff; background: rgba(15,17,21,.72); padding: 9px 12px; border-radius: 10px; font-weight: 600; }
+.checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.shutter { width: 74px; height: 74px; border-radius: 50%; border: 4px solid var(--ink); background: #fff; cursor: pointer; position: relative; }
+.shutter::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--accent); }
+.tips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tip { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: #F6F7F4; border: 1px solid var(--line); font-size: 13px; }
+.tip svg { width: 100%; height: 54px; }
+@media (max-width: 380px) { .tips { grid-template-columns: 1fr; } }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.switch input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+/* review */
+.rvwrap { position: relative; user-select: none; -webkit-user-select: none; }
+.rvwrap { display: flex; justify-content: center; }
+.rvwrap canvas.main { max-width: 100%; max-height: 64vh; width: auto; height: auto; display: block; border-radius: 10px; background: #1A1D22; touch-action: none; }
+.loupe { position: absolute; top: 8px; width: 128px; height: 128px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 18px rgba(0,0,0,.35); pointer-events: none; display: none; }
+.readout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.readout div { background: #F6F7F4; border-radius: 10px; padding: 8px; text-align: center; }
+.readout small { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.readout b { font-family: var(--mono); font-size: 15px; }
+.ratios { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ratio { display: flex; flex-direction: column; gap: 6px; }
+.scale { position: relative; margin-bottom: 18px; height: 26px; border-radius: 6px; background: linear-gradient(90deg, #DDF0E4 0 20%, #F4ECD7 20% 60%, #F6DEDB 60% 100%); }
+.scale i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(20,23,29,.25); }
+.scale i span { position: absolute; top: 100%; transform: translateX(-50%); font: 10px var(--mono); color: var(--muted); padding-top: 2px; white-space: nowrap; }
+.scale em { position: absolute; top: -4px; width: 4px; height: 34px; margin-left: -2px; border-radius: 2px; background: var(--ink); }
+.ratio .val { font-family: var(--mono); font-weight: 600; font-size: 17px; }
+.ratio .lbl { font-size: 12px; color: var(--muted); }
+.ratio .dir { font-size: 12.5px; color: var(--ink); }
+.nudge { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: #F6F7F4; }
+.nudge .btn { min-height: 40px; padding: 8px 12px; font-family: var(--mono); font-size: 13px; }
+
+/* results */
+.call { border-left: 5px solid var(--accent); }
+.call .big { font-family: var(--display); font-weight: 800; font-stretch: 105%; font-size: 22px; line-height: 1.2; text-wrap: balance; }
+.best td { background: #F1F3FE; }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cards figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.cards canvas { width: 100%; height: auto; border-radius: 8px; display: block; background: #1A1D22; }
+.cards figcaption { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+.zooms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.zooms figure { margin: 0; display: flex; flex-direction: column; gap: 3px; }
+.zooms canvas { width: 100%; aspect-ratio: 1; border-radius: 6px; display: block; background: #1A1D22; }
+.zooms figcaption { font: 11px var(--mono); color: var(--muted); text-align: center; }
+.checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.checklist label { display: flex; gap: 8px; align-items: center; font-size: 14px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.checklist input { width: 18px; height: 18px; accent-color: var(--accent); }
+@media (max-width: 380px) { .checklist { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field input { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fff; color: var(--ink); }
+details summary { cursor: pointer; font-weight: 600; }
+details[open] summary { margin-bottom: 8px; }
+details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: sp .8s linear infinite; display: inline-block; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+.busy { position: fixed; inset: 0; background: rgba(242,243,239,.8); display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; z-index: 10; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="brand" id="go-home" type="button" aria-label="PreGrade home"><b>PreGrade</b><span>Card pre-grader</span></button>
+    <div class="steps" id="steps" hidden><i data-s="front">Front</i><i data-s="back">Back</i><i data-s="results">Grades</i></div>
+  </header>
+
+  <!-- HOME -->
+  <section id="home" class="app" style="padding:0">
+    <div class="panel">
+      <div class="hero">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <h1>Will it slab a 10?</h1>
+          <p class="muted">Photograph the front and back of a Pokémon card. PreGrade measures centering to a tenth of a millimetre, checks corners, edges and surface, and estimates the grade at PSA, BGS, CGC, SGC and TAG.</p>
+        </div>
+        <div class="slab" aria-hidden="true"></div>
+      </div>
+      <button class="btn primary block" id="start" type="button">Grade a card</button>
+      <div class="how">
+        <div><b>01</b>Card on a dark, plain surface, out of its sleeve, under even light.</div>
+        <div><b>02</b>Line it up in the guide. The app checks focus, glare and angle.</div>
+        <div><b>03</b>Check the border lines, nudge them if needed, and read the grades.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h2>Your cards</h2><span class="small muted" id="hist-count"></span></div>
+      <div class="hist" id="hist"></div>
+    </div>
+
+    <div class="panel">
+      <details>
+        <summary>Where the grade numbers come from</summary>
+        <ul id="sources"></ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- CAPTURE -->
+  <section id="capture" class="app" style="padding:0" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 id="cap-title">Photograph the front</h2>
+      <button class="btn ghost" id="skip-back" type="button" hidden>Skip back</button>
+    </div>
+
+    <div id="live" hidden>
+      <div class="panel" style="padding:10px">
+        <div class="stage"><canvas id="live-cv"></canvas><div class="say" id="say">Starting camera…</div></div>
+        <div class="checks" id="checks"></div>
+        <div class="row" style="justify-content:space-between">
+          <label class="switch"><input type="checkbox" id="auto" checked> Auto-capture</label>
+          <button class="shutter" id="shoot" type="button" aria-label="Take photo"></button>
+          <button class="btn" id="use-file" type="button">Use a photo</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="nolive" class="panel">
+      <p class="small muted" id="nolive-msg">Live camera guidance isn't available in this viewer. Take the photo with your camera; PreGrade checks it straight after and tells you if a retake is needed.</p>
+      <div class="tips">
+        <div class="tip">
+          <svg viewBox="0 0 120 54" aria-hidden="true"><rect x="0" y="0" width="120" height="54" rx="8" fill="#23272E"/><rect x="44" y="6" width="30" height="42" rx="3" fill="#F2C531"/><rect x="48" y="10" width="22" height="34" rx="2" fill="#7BB28A"/></svg>
+          <b>Dark, plain background</b><span class="muted">Whitening on corners shows up against it.</span>
+        </div>
+        <div class="tip">
+          <svg viewBox="0 0 120 54" aria-hidden="true"><rect width="120" height="54" rx="8" fill="#F6F7F4"/><rect x="44" y="12" width="30" height="36" rx="3" fill="#F2C531"/><path d="M20 4 L44 30 M100 4 L74 30" stroke="#A86400" stroke-width="2" stroke-dasharray="3 3"/><circle cx="20" cy="6" r="5" fill="#F2C531"/><circle cx="100" cy="6" r="5" fill="#F2C531"/></svg>
+          <b>Even light, no glare</b><span class="muted">Light from two sides, not straight above.</span>
+        </div>
+        <div class="tip">
+          <svg viewBox="0 0 120 54" aria-hidden="true"><rect width="120" height="54" rx="8" fill="#F6F7F4"/><rect x="40" y="4" width="40" height="8" rx="2" fill="#14171D"/><path d="M60 12 V22" stroke="#1F3FD1" stroke-width="2"/><rect x="45" y="24" width="30" height="26" rx="3" fill="#F2C531"/></svg>
+          <b>Phone flat above</b><span class="muted">Parallel to the card, card upright.</span>
+        </div>
+        <div class="tip">
+          <svg viewBox="0 0 120 54" aria-hidden="true"><rect width="120" height="54" rx="8" fill="#F6F7F4"/><path d="M38 6 h-6 v6 M82 6 h6 v6 M38 48 h-6 v-6 M82 48 h6 v-6" stroke="#1F3FD1" stroke-width="2" fill="none"/><rect x="38" y="8" width="44" height="38" rx="3" fill="#F2C531"/></svg>
+          <b>Fill the frame</b><span class="muted">Leave a thin margin of background all round.</span>
+        </div>
+      </div>
+      <button class="btn primary block" id="take" type="button">Take photo</button>
+      <button class="btn block" id="pick" type="button">Choose from photos</button>
+    </div>
+    <input type="file" id="f-cam" accept="image/*" capture="environment" hidden>
+    <input type="file" id="f-pick" accept="image/*" hidden>
+  </section>
+
+  <!-- REVIEW -->
+  <section id="review" class="app" style="padding:0" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 id="rv-title">Check the front borders</h2>
+      <span class="pill" id="rv-auto">Auto-detected</span>
+    </div>
+    <div class="row small muted" id="rv-stage" style="margin-top:-10px">
+    </div>
+    <ul class="notes" id="rv-notes"></ul>
+    <div class="panel" style="padding:10px;gap:10px">
+      <div class="rvwrap" id="rvwrap">
+        <canvas class="main" id="rv"></canvas>
+        <canvas class="loupe" id="loupe" width="256" height="256"></canvas>
+      </div>
+      <div class="legend" id="line-legend"><span style="--c:#12A150">Card edge (outer)</span><span style="--c:#1F3FD1">Print border edge (inner)</span></div>
+      <div class="nudge" id="nudge"><span id="nudge-name" class="small">Tap a line to fine-tune it</span><div class="row" style="gap:6px"><button class="btn" id="nudge-minus" type="button" disabled>◀ 0.05 mm</button><button class="btn" id="nudge-plus" type="button" disabled>0.05 mm ▶</button></div></div>
+      <p class="small muted" id="rv-help">Drag a blue line onto the inner edge of the border. The loupe shows the detail under your finger.</p>
+      <div class="readout" id="readout"></div>
+      <div class="ratios" id="ratios"></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="rv-retake" type="button">Retake</button>
+      <button class="btn" id="rv-outline" type="button">Move corners</button>
+      <button class="btn" id="rv-reset" type="button">Reset lines</button>
+    </div>
+    <div class="row" id="ol-bar" hidden>
+      <button class="btn primary" id="ol-apply" type="button">Outline is on the card edge</button>
+      <button class="btn" id="ol-retake" type="button">Retake</button>
+      <button class="btn" id="ol-cancel" type="button">Cancel</button>
+    </div>
+    <button class="btn primary block" id="rv-next" type="button">Next: photograph the back</button>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="results" class="app" style="padding:0" hidden>
+    <div class="panel call">
+      <span class="tag-ex" id="res-ex" hidden>Example · synthetic demo card</span>
+      <div class="big" id="call"></div>
+      <p class="muted small" id="call-why"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Estimated grades</h2>
+      <div class="tablewrap"><table id="verdict"></table></div>
+      <p class="small muted" id="verdict-note"></p>
+    </div>
+
+    <div class="panel">
+      <h2>What was measured</h2>
+      <div class="tablewrap"><table id="factors"></table></div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2>Corners and edges up close</h2>
+        <label class="switch small"><input type="checkbox" id="show-mask" checked> Highlight</label>
+      </div>
+      <div class="legend"><span style="--c:#E0249A">Whitening</span><span style="--c:#10B5D6">Spot or scratch in border</span><span style="--c:#F2A900">Glare</span></div>
+      <div class="cards" id="cards"></div>
+      <div id="zooms"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Surface: what you see in hand</h2>
+      <p class="small muted">Tilt the card under a lamp. Photos miss dents and fine scratches, so tick anything you find and the grades update.</p>
+      <div class="checklist" id="flags"></div>
+    </div>
+
+    <div class="panel" id="ai-panel" hidden>
+      <h2>Second opinion from Claude</h2>
+      <p class="small muted">Sends the straightened front and back plus corner close-ups to Claude, which looks for scratches, print lines, dents and wear the measurements can't see.</p>
+      <button class="btn" id="ai-go" type="button">Ask Claude to inspect</button>
+      <div id="ai-out"></div>
+    </div>
+
+    <div class="panel">
+      <div class="field"><label for="cardname">Card name</label><input id="cardname" placeholder="e.g. Charizard ex 199/165"></div>
+      <div class="row">
+        <button class="btn primary" id="save" type="button">Save to my cards</button>
+        <button class="btn" id="edit-front" type="button">Adjust front</button>
+        <button class="btn" id="edit-back" type="button">Adjust back</button>
+      </div>
+      <button class="btn block" id="again" type="button">Grade another card</button>
+    </div>
+    <p class="small muted">Estimates from photos, not a grading service. Graders look at the card under magnification and can see things a phone camera can't.</p>
+  </section>
+</div>
+<div class="busy" id="busy" hidden><span class="spin"></span><span id="busy-msg">Measuring…</span></div>
+
+<script id="cv-src">/* PreGrade computer-vision core. Pure JS, works on {width,height,data:RGBA} images.
+   Canonical card space: 63 x 88 mm at MM px per mm. */
+(function (root) {
+  'use strict';
+  const MM = 10, CW = 63, CH = 88, W = CW * MM, H = CH * MM, R_MM = 3;
+
+  function mkImg(w, h) { return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }; }
+  function median(a) { if (!a.length) return 0; const s = Array.from(a).sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+  function pct(a, p) { if (!a.length) return 0; const s = Array.from(a).sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.max(0, Math.round(p * (s.length - 1))))]; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function cdist(a, b) { const r = a[0] - b[0], g = a[1] - b[1], bl = a[2] - b[2]; return Math.sqrt(r * r + g * g + bl * bl); }
+
+  // Seeded RNG so detection is repeatable for the same photo.
+  function rng(seed) { let s = seed >>> 0 || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+  function downscale(img, maxDim) {
+    const s = Math.min(1, maxDim / Math.max(img.width, img.height));
+    if (s >= 1) return { img, scale: 1 };
+    const w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+    const out = mkImg(w, h), d = img.data, o = out.data, iw = img.width, ih = img.height;
+    const fx = iw / w, fy = ih / h;
+    for (let y = 0; y < h; y++) {
+      const y0 = Math.floor(y * fy), y1 = Math.min(ih, Math.max(y0 + 1, Math.floor((y + 1) * fy)));
+      for (let x = 0; x < w; x++) {
+        const x0 = Math.floor(x * fx), x1 = Math.min(iw, Math.max(x0 + 1, Math.floor((x + 1) * fx)));
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let yy = y0; yy < y1; yy++) { let p = (yy * iw + x0) * 4; for (let xx = x0; xx < x1; xx++, p += 4) { r += d[p]; g += d[p + 1]; b += d[p + 2]; n++; } }
+        const q = (y * w + x) * 4; o[q] = r / n; o[q + 1] = g / n; o[q + 2] = b / n; o[q + 3] = 255;
+      }
+    }
+    return { img: out, scale: w / iw };
+  }
+
+  function sample(img, x, y, out) {
+    const w = img.width, h = img.height, d = img.data;
+    if (x < 0) x = 0; if (y < 0) y = 0; if (x > w - 1.001) x = w - 1.001; if (y > h - 1.001) y = h - 1.001;
+    const x0 = x | 0, y0 = y | 0, ax = x - x0, ay = y - y0, p = (y0 * w + x0) * 4, q = p + w * 4;
+    for (let c = 0; c < 3; c++) out[c] = (d[p + c] * (1 - ax) + d[p + 4 + c] * ax) * (1 - ay) + (d[q + c] * (1 - ax) + d[q + 4 + c] * ax) * ay;
+    return out;
+  }
+
+  function solve(A, b) {
+    const n = b.length, M = A.map((r, i) => r.concat([b[i]]));
+    for (let c = 0; c < n; c++) {
+      let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      const t = M[c]; M[c] = M[p]; M[p] = t;
+      const v = M[c][c]; if (Math.abs(v) < 1e-12) return null;
+      for (let r = 0; r < n; r++) { if (r === c) continue; const f = M[r][c] / v; if (f) for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+    }
+    return M.map((r, i) => r[n] / r[i]);
+  }
+  function homography(src, dst) {
+    const A = [], b = [];
+    for (let i = 0; i < 4; i++) {
+      const x = src[i][0], y = src[i][1], u = dst[i][0], v = dst[i][1];
+      A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+      A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+    }
+    const h = solve(A, b); if (!h) return null;
+    return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+  }
+  function applyH(Hm, x, y) { const w = Hm[6] * x + Hm[7] * y + Hm[8]; return [(Hm[0] * x + Hm[1] * y + Hm[2]) / w, (Hm[3] * x + Hm[4] * y + Hm[5]) / w]; }
+
+  // quad: [tl,tr,br,bl] in image coords (continuous). Output ow x oh image.
+  function warp(img, quad, ow, oh) {
+    const Hm = homography([[0, 0], [ow, 0], [ow, oh], [0, oh]], quad);
+    const out = mkImg(ow, oh), o = out.data, t = [0, 0, 0];
+    for (let y = 0; y < oh; y++) {
+      const yy = y + 0.5;
+      for (let x = 0; x < ow; x++) {
+        const xx = x + 0.5, w = Hm[6] * xx + Hm[7] * yy + Hm[8];
+        sample(img, (Hm[0] * xx + Hm[1] * yy + Hm[2]) / w, (Hm[3] * xx + Hm[4] * yy + Hm[5]) / w, t);
+        const p = (y * ow + x) * 4; o[p] = t[0]; o[p + 1] = t[1]; o[p + 2] = t[2]; o[p + 3] = 255;
+      }
+    }
+    return out;
+  }
+
+  function otsu(vals, maxV) {
+    const bins = 256, hist = new Float64Array(bins), k = (bins - 1) / maxV;
+    for (let i = 0; i < vals.length; i++) hist[Math.min(bins - 1, (vals[i] * k) | 0)]++;
+    let sum = 0, tot = vals.length; for (let i = 0; i < bins; i++) sum += i * hist[i];
+    let sB = 0, wB = 0, best = 0, th = 0;
+    for (let i = 0; i < bins; i++) {
+      wB += hist[i]; if (!wB) continue; const wF = tot - wB; if (!wF) break;
+      sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF);
+      if (v > best) { best = v; th = i; }
+    }
+    return th / k;
+  }
+
+  function orderPortrait(q) {
+    const len = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const wAvg = (len(q[0], q[1]) + len(q[3], q[2])) / 2, hAvg = (len(q[0], q[3]) + len(q[1], q[2])) / 2;
+    if (wAvg > hAvg) return [q[3], q[0], q[1], q[2]];
+    return q;
+  }
+
+  // Rough card location on a small image: background colour from the frame ring, Otsu mask, largest blob, extreme points.
+  function roughQuad(small) {
+    const w = small.width, h = small.height, d = small.data;
+    const ring = Math.max(2, Math.round(Math.min(w, h) * 0.03));
+    const rs = [], gs = [], bs = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (x < ring || y < ring || x >= w - ring || y >= h - ring) { const p = (y * w + x) * 4; rs.push(d[p]); gs.push(d[p + 1]); bs.push(d[p + 2]); }
+    }
+    const bg = [median(rs), median(gs), median(bs)];
+    const N = w * h, dist = new Float32Array(N);
+    for (let i = 0, p = 0; i < N; i++, p += 4) { const r = d[p] - bg[0], g = d[p + 1] - bg[1], b = d[p + 2] - bg[2]; dist[i] = Math.sqrt(r * r + g * g + b * b); }
+    const thr = Math.max(28, otsu(dist, 442));
+    const lab = new Int32Array(N), stack = new Int32Array(N);
+    let bestLab = 0, bestN = 0, cur = 0;
+    for (let i = 0; i < N; i++) {
+      if (lab[i] || dist[i] <= thr) continue;
+      cur++; let sp = 0, n = 0; stack[sp++] = i; lab[i] = cur;
+      while (sp) {
+        const j = stack[--sp]; n++; const x = j % w, y = (j / w) | 0;
+        if (x > 0 && !lab[j - 1] && dist[j - 1] > thr) { lab[j - 1] = cur; stack[sp++] = j - 1; }
+        if (x < w - 1 && !lab[j + 1] && dist[j + 1] > thr) { lab[j + 1] = cur; stack[sp++] = j + 1; }
+        if (y > 0 && !lab[j - w] && dist[j - w] > thr) { lab[j - w] = cur; stack[sp++] = j - w; }
+        if (y < h - 1 && !lab[j + w] && dist[j + w] > thr) { lab[j + w] = cur; stack[sp++] = j + w; }
+      }
+      if (n > bestN) { bestN = n; bestLab = cur; }
+    }
+    if (!bestLab || bestN < N * 0.04) return null;
+    let tl = null, tr = null, br = null, bl = null, a1 = Infinity, a2 = -Infinity, a3 = -Infinity, a4 = Infinity;
+    let touch = 0, minX = w, maxX = 0, minY = h, maxY = 0;
+    for (let i = 0; i < N; i++) {
+      if (lab[i] !== bestLab) continue; const x = i % w, y = (i / w) | 0;
+      if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+      const s = x + y, df = x - y;
+      if (s < a1) { a1 = s; tl = [x, y]; } if (s > a3) { a3 = s; br = [x + 1, y + 1]; }
+      if (df > a2) { a2 = df; tr = [x + 1, y]; } if (df < a4) { a4 = df; bl = [x, y + 1]; }
+    }
+    if (minX <= 1) touch++; if (minY <= 1) touch++; if (maxX >= w - 2) touch++; if (maxY >= h - 2) touch++;
+    const q = orderPortrait([tl, tr, br, bl]);
+    const area = polyArea(q);
+    return { quad: q, fill: bestN / Math.max(1, area), touch, bg };
+  }
+  function polyArea(q) { let a = 0; for (let i = 0; i < 4; i++) { const p = q[i], n = q[(i + 1) % 4]; a += p[0] * n[1] - n[0] * p[1]; } return Math.abs(a) / 2; }
+
+  function fitLine(pts, rand) {
+    if (pts.length < 6) return null;
+    let bestIn = null, bestN = 0; const tol = 1.5;
+    for (let it = 0; it < 150; it++) {
+      const a = pts[(rand() * pts.length) | 0], b = pts[(rand() * pts.length) | 0]; if (a === b) continue;
+      let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy); if (L < 3) continue; dx /= L; dy /= L;
+      const inl = []; for (const p of pts) if (Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) < tol) inl.push(p);
+      if (inl.length > bestN) { bestN = inl.length; bestIn = inl; }
+    }
+    if (!bestIn || bestN < 4) return null;
+    let mx = 0, my = 0; for (const p of bestIn) { mx += p[0]; my += p[1]; } mx /= bestN; my /= bestN;
+    let sxx = 0, sxy = 0, syy = 0; for (const p of bestIn) { const dx = p[0] - mx, dy = p[1] - my; sxx += dx * dx; sxy += dx * dy; syy += dy * dy; }
+    const th = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    return { x: mx, y: my, dx: Math.cos(th), dy: Math.sin(th), inl: bestN / pts.length };
+  }
+  function intersect(l1, l2) {
+    const det = l1.dx * l2.dy - l1.dy * l2.dx; if (Math.abs(det) < 1e-9) return null;
+    const t = ((l2.x - l1.x) * l2.dy - (l2.y - l1.y) * l2.dx) / det;
+    return [l1.x + l1.dx * t, l1.y + l1.dy * t];
+  }
+
+  // Find the card's cut edge along one side. Picks the outermost strong colour step (card -> background).
+  function sideEdge(img, p0, p1, band, nS, near) {
+    const dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, nx = uy, ny = -ux;
+    const steps = Math.ceil(band * 2), cols = new Float32Array((steps + 1) * 3), g = new Float32Array(steps + 1), t = [0, 0, 0];
+    const pts = [], widths = [];
+    for (let k = 0; k < nS; k++) {
+      const tt = 0.1 + 0.8 * k / (nS - 1), bx = p0[0] + dx * tt, by = p0[1] + dy * tt;
+      for (let i = 0; i <= steps; i++) {
+        const s = -band + i;
+        // average 3 samples along the edge direction to cut noise
+        let r = 0, gg = 0, b = 0;
+        for (let j = -1; j <= 1; j++) { sample(img, bx + nx * s + ux * j * 1.5, by + ny * s + uy * j * 1.5, t); r += t[0]; gg += t[1]; b += t[2]; }
+        cols[i * 3] = r / 3; cols[i * 3 + 1] = gg / 3; cols[i * 3 + 2] = b / 3;
+      }
+      let gmax = 0;
+      for (let i = 1; i < steps; i++) {
+        const a = (i - 1) * 3, c = (i + 1) * 3, r = cols[c] - cols[a], gg = cols[c + 1] - cols[a + 1], b = cols[c + 2] - cols[a + 2];
+        g[i] = Math.sqrt(r * r + gg * gg + b * b); if (g[i] > gmax) gmax = g[i];
+      }
+      g[0] = 0; g[steps] = 0;
+      if (gmax < 18) continue;
+      let pk = -1;
+      if (near) {
+        let bs = 0; for (let i = 1; i < steps; i++) { if (g[i] < g[i - 1] || g[i] < g[i + 1] || g[i] < 0.3 * gmax) continue; const s0 = (i - band) / (band * 0.6), sc = g[i] * Math.exp(-s0 * s0); if (sc > bs) { bs = sc; pk = i; } }
+      } else for (let i = steps - 1; i >= 1; i--) { if (g[i] >= 0.6 * gmax && g[i] >= g[i - 1] && g[i] >= g[i + 1]) { pk = i; break; } }
+      if (pk < 0) continue;
+      const a = g[pk - 1], b = g[pk], c = g[pk + 1], den = a - 2 * b + c, off = den ? clamp(0.5 * (a - c) / den, -0.5, 0.5) : 0;
+      const s = -band + pk + off;
+      pts.push([bx + nx * s, by + ny * s]);
+      // edge sharpness: width of the gradient peak at half height
+      let lo = pk, hi = pk; while (lo > 0 && g[lo] > b / 2) lo--; while (hi < steps && g[hi] > b / 2) hi++;
+      widths.push(hi - lo);
+    }
+    return { pts, width: median(widths) };
+  }
+
+  function refine(img, quad, band, rand, near) {
+    const sides = [[quad[0], quad[1]], [quad[1], quad[2]], [quad[2], quad[3]], [quad[3], quad[0]]];
+    const lines = [], widths = []; let cnt = 0;
+    for (const [a, b] of sides) {
+      const r = sideEdge(img, a, b, band, 44, near); cnt += r.pts.length;
+      const ln = fitLine(r.pts, rand); if (!ln) return null; lines.push(ln); widths.push(r.width);
+    }
+    const q = [intersect(lines[3], lines[0]), intersect(lines[0], lines[1]), intersect(lines[1], lines[2]), intersect(lines[2], lines[3])];
+    if (q.some(p => !p || !isFinite(p[0]))) return null;
+    return { quad: q, inl: Math.min(...lines.map(l => l.inl)), edgeWidthPx: median(widths), samples: cnt };
+  }
+
+  function quadStats(q) {
+    const len = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const top = len(q[0], q[1]), bot = len(q[3], q[2]), left = len(q[0], q[3]), right = len(q[1], q[2]);
+    const aspect = ((top + bot) / 2) / ((left + right) / 2);
+    const ang = Math.atan2(q[1][1] - q[0][1], q[1][0] - q[0][0]) * 180 / Math.PI;
+    return { top, bot, left, right, aspect, keyV: top / bot, keyH: left / right, angle: ang, pxPerMm: ((left + right) / 2) / CH };
+  }
+
+
+  // ---- Robust finder: straight edges (Hough) scored by how well a card-shaped quad is supported by edges ----
+  function gradients(img) {
+    const w = img.width, h = img.height, d = img.data, N = w * h;
+    const gx = new Float32Array(N), gy = new Float32Array(N), mag = new Float32Array(N);
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      let best = -1, bx = 0, by = 0;
+      for (let c = 0; c < 3; c++) {
+        const p = (y * w + x) * 4 + c, r = w * 4;
+        const sx = (d[p - r + 4] + 2 * d[p + 4] + d[p + r + 4]) - (d[p - r - 4] + 2 * d[p - 4] + d[p + r - 4]);
+        const sy = (d[p + r - 4] + 2 * d[p + r] + d[p + r + 4]) - (d[p - r - 4] + 2 * d[p - r] + d[p - r + 4]);
+        const m = sx * sx + sy * sy; if (m > best) { best = m; bx = sx; by = sy; }
+      }
+      const i = y * w + x; gx[i] = bx; gy[i] = by; mag[i] = Math.sqrt(best);
+    }
+    return { gx, gy, mag, w, h };
+  }
+  function edgePixels(G) {
+    const { gx, gy, mag, w, h } = G, N = w * h, vals = [];
+    for (let i = 0; i < N; i += 7) vals.push(mag[i]);
+    const thr = Math.max(30, pct(vals, 0.80));
+    const out = [];
+    for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
+      const i = y * w + x, m = mag[i]; if (m < thr) continue;
+      // non-maximum suppression along the gradient
+      const ax = Math.abs(gx[i]), ay = Math.abs(gy[i]);
+      let a, b;
+      if (ax > 2.4 * ay) { a = mag[i - 1]; b = mag[i + 1]; }
+      else if (ay > 2.4 * ax) { a = mag[i - w]; b = mag[i + w]; }
+      else if (gx[i] * gy[i] > 0) { a = mag[i - w - 1]; b = mag[i + w + 1]; }
+      else { a = mag[i - w + 1]; b = mag[i + w - 1]; }
+      if (m >= a && m >= b) out.push(i);
+    }
+    return { pts: out, thr };
+  }
+  function houghLines(G, E) {
+    const { gx, gy, w } = G, D = Math.ceil(Math.hypot(G.w, G.h)), NR = 2 * D + 1, NT = 180;
+    const acc = new Float32Array(NT * NR), cs = new Float32Array(NT), sn = new Float32Array(NT);
+    for (let t = 0; t < NT; t++) { cs[t] = Math.cos(t * Math.PI / 180); sn[t] = Math.sin(t * Math.PI / 180); }
+    const mag = G.mag, H0 = G.h;
+    for (const i of E.pts) {
+      const x = i % w, y = (i / w) | 0;
+      // Card edges have a smooth, untextured band (the border) on one side; texture such as wood grain has none.
+      const m = mag[i] || 1, ux = gx[i] / m, uy = gy[i] / m;
+      let calm = 0;
+      for (const sgn of [1, -1]) {
+        let e = 0, n = 0;
+        for (let k = 3; k <= 7; k++) { const xx = Math.round(x + sgn * ux * k), yy = Math.round(y + sgn * uy * k); if (xx < 0 || yy < 0 || xx >= w || yy >= H0) continue; e += mag[yy * w + xx]; n++; }
+        if (n) calm = Math.max(calm, 1 - Math.min(1, (e / n) / (E.thr * 0.5)));
+      }
+      const wv = 0.25 + 0.75 * calm;
+      let phi = Math.round(Math.atan2(gy[i], gx[i]) * 180 / Math.PI); phi = ((phi % 180) + 180) % 180;
+      for (let dt = -5; dt <= 5; dt++) {
+        const t = (phi + dt + 180) % 180, r = Math.round(x * cs[t] + y * sn[t]) + D;
+        acc[t * NR + r] += wv;
+      }
+    }
+    const peaks = [];
+    for (let t = 0; t < NT; t++) for (let r = 1; r < NR - 1; r++) {
+      const v = acc[t * NR + r]; if (v < 8) continue;
+      let isMax = true;
+      for (let dt = -3; dt <= 3 && isMax; dt++) for (let dr = -4; dr <= 4; dr++) {
+        if (!dt && !dr) continue; const tt = (t + dt + 180) % 180, rr = r + dr;
+        if (rr < 0 || rr >= NR) continue; const u = acc[tt * NR + rr];
+        if (u > v || (u === v && (dt < 0 || (dt === 0 && dr < 0)))) { isMax = false; break; }
+      }
+      if (isMax) peaks.push({ t, r: r - D, v, nx: cs[t], ny: sn[t] });
+    }
+    peaks.sort((a, b) => b.v - a.v);
+    const vert = [], hori = [];
+    for (const p of peaks) {
+      if ((p.t <= 35 || p.t >= 145) && vert.length < 30) vert.push(p);
+      else if (p.t >= 55 && p.t <= 125 && hori.length < 30) hori.push(p);
+      if (vert.length >= 30 && hori.length >= 30) break;
+    }
+    return { vert, hori };
+  }
+  function lineX(l, y) { return (l.r - y * l.ny) / l.nx; }
+  function lineY(l, x) { return (l.r - x * l.nx) / l.ny; }
+  function meet(a, b) { const det = a.nx * b.ny - a.ny * b.nx; if (Math.abs(det) < 1e-6) return null; return [(a.r * b.ny - b.r * a.ny) / det, (a.nx * b.r - b.nx * a.r) / det]; }
+  // Fraction of points along a segment that sit on a strong edge running the same way.
+  function support(G, thr, p0, p1) {
+    const dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy); if (L < 8) return 0;
+    const nx = -dy / L, ny = dx / L, n = 40; let hit = 0;
+    for (let k = 0; k < n; k++) {
+      const t = 0.1 + 0.8 * k / (n - 1), bx = p0[0] + dx * t, by = p0[1] + dy * t;
+      for (let o = -2; o <= 2; o++) {
+        const x = Math.round(bx + nx * o), y = Math.round(by + ny * o); if (x < 1 || y < 1 || x >= G.w - 1 || y >= G.h - 1) continue;
+        const i = y * G.w + x, m = G.mag[i]; if (m < thr * 0.6) continue;
+        const c = Math.abs(G.gx[i] * nx + G.gy[i] * ny) / (m || 1);
+        if (c > 0.85) { hit++; break; }
+      }
+    }
+    return hit / n;
+  }
+  // Colour ring just inside a quad: on a real card it's the border, one colour all the way round.
+  function ring(S, q, off) {
+    const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+    const ins = [], outs = [], perSide = [];
+    for (let i = 0; i < 4; i++) {
+      const p0 = q[i], p1 = q[(i + 1) % 4], dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy); let nx = -dy / L, ny = dx / L;
+      const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2; if ((cx - mx) * nx + (cy - my) * ny < 0) { nx = -nx; ny = -ny; }
+      const si = [], so = [];
+      for (let k = 0; k < 20; k++) {
+        const tt = 0.15 + 0.7 * k / 19, bx = p0[0] + dx * tt, by = p0[1] + dy * tt;
+        si.push(sample(S, bx + nx * off, by + ny * off, [0, 0, 0]).slice()); so.push(sample(S, bx - nx * off * 1.5, by - ny * off * 1.5, [0, 0, 0]).slice());
+      }
+      ins.push(...si); outs.push(so); perSide.push(si);
+    }
+    const m = [0, 1, 2].map(c => median(ins.map(v => v[c])));
+    const mad = median(ins.map(v => cdist(v, m))), p80 = pct(ins.map(v => cdist(v, m)), 0.8);
+    const con = Math.min(...outs.map(so => Math.min(1, median(so.map(v => cdist(v, m))) / 50)));
+    return { score: 1 - Math.min(1, (0.5 * mad + 0.5 * p80) / 45), contrast: con };
+  }
+  // How much a side's edge keeps going past its corners. A card edge stops; wood grain or a table edge doesn't.
+  function runOn(G, thr, p0, p1) {
+    const dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy); if (L < 8) return 0;
+    const nx = -dy / L, ny = dx / L; let hit = 0, n = 0;
+    for (const [a, sgn] of [[p1, 1], [p0, -1]]) for (let k = 1; k <= 10; k++) {
+      const t = 0.03 + 0.15 * k / 10, bx = a[0] + sgn * dx * t, by = a[1] + sgn * dy * t;
+      if (bx < 1 || by < 1 || bx >= G.w - 1 || by >= G.h - 1) continue; n++;
+      for (let o = -1; o <= 1; o++) {
+        const x = Math.round(bx + nx * o), y = Math.round(by + ny * o), i = y * G.w + x, m = G.mag[i];
+        if (m >= thr * 0.6 && Math.abs(G.gx[i] * nx + G.gy[i] * ny) / (m || 1) > 0.85) { hit++; break; }
+      }
+    }
+    return n ? hit / n : 0;
+  }
+  // If the quad found is the card's print frame, an even band of border colour surrounds it, ending at the cut edge.
+  function expandToCard(S, q) {
+    const st = quadStats(q), minSide = Math.min(st.left, st.right, st.top, st.bot), maxS = Math.max(6, Math.round(minSide * 0.11));
+    const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+    const sides = [], t = [0, 0, 0];
+    for (let i = 0; i < 4; i++) {
+      const p0 = q[i], p1 = q[(i + 1) % 4], dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy); let nx = -dy / L, ny = dx / L;
+      const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2; if ((cx - mx) * nx + (cy - my) * ny > 0) { nx = -nx; ny = -ny; } // outward
+      const ws = [], cols = [], ins = [];
+      for (let k = 0; k < 20; k++) {
+        const tt = 0.15 + 0.7 * k / 19, bx = p0[0] + dx * tt, by = p0[1] + dy * tt;
+        const c2 = sample(S, bx + nx * 2, by + ny * 2, [0, 0, 0]).slice(); cols.push(c2);
+        ins.push(sample(S, bx - nx * 2, by - ny * 2, [0, 0, 0]).slice());
+        let w = -1;
+        for (let s2 = 3; s2 <= maxS; s2++) {
+          const a = sample(S, bx + nx * s2, by + ny * s2, t).slice(), b = sample(S, bx + nx * (s2 + 1), by + ny * (s2 + 1), [0, 0, 0]);
+          if (cdist(a, c2) > 40 && cdist(b, c2) > 40) { w = s2 - 0.5; break; }
+        }
+        if (w > 0) ws.push(w);
+      }
+      if (ws.length < 10) return null;
+      const m = median(ws), cons = ws.filter(v => Math.abs(v - m) <= 1.5).length / 20;
+      const bc = [0, 1, 2].map(c => median(cols.map(v => v[c]))), ic = [0, 1, 2].map(c => median(ins.map(v => v[c])));
+      sides.push({ w: m, cons, bc, ic, nx, ny });
+    }
+    if (sides.some(sd => sd.cons < 0.55 || sd.w < minSide * 0.02 || sd.w > minSide * 0.105)) return null;
+    const bm = [0, 1, 2].map(c => median(sides.map(sd => sd.bc[c])));
+    if (median(sides.map(sd => cdist(sd.bc, bm))) > 35) return null;          // same border colour all round
+    if (median(sides.map(sd => cdist(sd.ic, sd.bc))) < 30) return null;       // and it differs from what's inside
+    const lines = sides.map((sd, i) => { const p0 = q[i], p1 = q[(i + 1) % 4], L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      return { x: p0[0] + sd.nx * sd.w, y: p0[1] + sd.ny * sd.w, dx: (p1[0] - p0[0]) / L, dy: (p1[1] - p0[1]) / L }; });
+    const nq = [intersect(lines[3], lines[0]), intersect(lines[0], lines[1]), intersect(lines[1], lines[2]), intersect(lines[2], lines[3])];
+    if (nq.some(p => !p)) return null;
+    const ns = quadStats(nq), r = ns.aspect > 1 ? 1 / ns.aspect : ns.aspect;
+    return Math.abs(r - CW / CH) < 0.05 ? nq : null;
+  }
+  function findCardQuad(img, maxDim) {
+    const sm = downscale(img, maxDim || 480), S = sm.img, G = gradients(S), E = edgePixels(G);
+    if (E.pts.length < 50) return null;
+    const { vert, hori } = houghLines(G, E);
+    if (vert.length < 2 || hori.length < 2) return null;
+    const W0 = S.width, H0 = S.height, area0 = W0 * H0, cands = [];
+    for (let a = 0; a < vert.length; a++) for (let b = a + 1; b < vert.length; b++) {
+      let L = vert[a], R = vert[b];
+      if (lineX(L, H0 / 2) > lineX(R, H0 / 2)) { const t = L; L = R; R = t; }
+      const wmid = lineX(R, H0 / 2) - lineX(L, H0 / 2); if (wmid < W0 * 0.12) continue;
+      for (let c = 0; c < hori.length; c++) for (let d = c + 1; d < hori.length; d++) {
+        let T = hori[c], B = hori[d];
+        if (lineY(T, W0 / 2) > lineY(B, W0 / 2)) { const t = T; T = B; B = t; }
+        const q = [meet(L, T), meet(R, T), meet(R, B), meet(L, B)];
+        if (q.some(p => !p || p[0] < -W0 * 0.03 || p[1] < -H0 * 0.03 || p[0] > W0 * 1.03 || p[1] > H0 * 1.03)) continue;
+        const st = quadStats(q), ar = st.aspect, area = polyArea(q);
+        const portrait = ar > 0.6 && ar < 0.84, landscape = ar > 1.19 && ar < 1.67;
+        if (!portrait && !landscape) continue;
+        if (area < area0 * 0.05) continue;
+        if (Math.max(st.keyV, 1 / st.keyV, st.keyH, 1 / st.keyH) > 1.3) continue;
+        const sup = [support(G, E.thr, q[0], q[1]), support(G, E.thr, q[1], q[2]), support(G, E.thr, q[2], q[3]), support(G, E.thr, q[3], q[0])];
+        const mn = Math.min(...sup), mean = (sup[0] + sup[1] + sup[2] + sup[3]) / 4;
+        if (mn < 0.45) continue;
+        const target = portrait ? CW / CH : CH / CW, aspPen = 1 - Math.min(0.5, Math.abs(ar - target) * 2);
+        const off = Math.max(1.5, Math.min(st.left, st.right, st.top, st.bot) * 0.016);
+        const rg = ring(S, q, off);
+        const run = [0, 1, 2, 3].map(i => runOn(G, E.thr, q[i], q[(i + 1) % 4])), excl = 1 - Math.max(...run) * 0.6 - (run.reduce((a, b) => a + b, 0) / 4) * 0.4;
+        const score = (0.6 * mn + 0.4 * mean) * aspPen * (0.3 + 0.5 * rg.score + 0.2 * rg.contrast) * (0.4 + 0.6 * Math.max(0, excl));
+        cands.push({ q, score, area, sup: mean });
+      }
+    }
+    if (!cands.length) return null;
+    cands.sort((x, y) => y.score - x.score); if (typeof globalThis !== "undefined") globalThis.__cands = { cands, sm, vert, hori };
+    // The card's inner print frame is also card-shaped; prefer the largest well-supported quad (the cut edge).
+    const top = cands[0].score, good = cands.filter(c => c.score >= top * 0.93);
+    good.sort((x, y) => y.area - x.area);
+    const pick = good[0], k = 1 / sm.scale;
+    const grown = expandToCard(S, pick.q), fq = grown || pick.q;
+    return { quad: orderPortrait(fq.map(p => [p[0] * k, p[1] * k])), score: pick.score, n: cands.length, grown: !!grown };
+  }
+
+  // Full detection on a working image (~1600-2400px). opts.rough: quad guess in the same coords.
+  function detectCard(img, opts) {
+    opts = opts || {};
+    const rand = rng(img.width * 7919 + img.height);
+    let rq = opts.rough, info = {}, viaHough = false;
+    const maxDim = Math.max(img.width, img.height);
+    if (!rq) {
+      const hq = findCardQuad(img);
+      if (hq) { rq = hq.quad; info = hq; viaHough = true; }
+      else {
+        const sm = downscale(img, 420), r = roughQuad(sm.img);
+        if (!r) return { ok: false, reason: 'no-card' };
+        info = r; rq = r.quad.map(p => [p[0] / sm.scale, p[1] / sm.scale]);
+      }
+    }
+    let band = opts.band || (viaHough ? Math.max(8, maxDim * 0.012) : Math.max(10, maxDim * 0.025));
+    const near = viaHough || !!opts.near;
+    // When snapping to the nearest edge, never search further than ~0.9 mm: the print border is always wider than that.
+    if (near) band = Math.min(band, Math.max(4, 0.9 * quadStats(rq).pxPerMm));
+    let res = refine(img, rq, band, rand, near);
+    if (!res) return { ok: false, reason: 'edges', rough: rq };
+    const res2 = refine(img, res.quad, Math.max(near ? 3 : 6, band * (near ? 0.5 : 0.35)), rand, near);
+    if (res2) res = res2;
+    const st = quadStats(res.quad);
+    const aspectOk = Math.abs(st.aspect - CW / CH) < 0.07;
+    return { ok: aspectOk && res.inl > 0.5, quad: res.quad, conf: res.inl, aspect: st.aspect, stats: st, edgeWidthMm: res.edgeWidthPx / st.pxPerMm, rough: rq, info, reason: aspectOk ? '' : 'aspect' };
+  }
+
+  function toCanonical(img, quad) { return warp(img, quad, W, H); }
+
+  // --- Border (centering) measurement on canonical image ---
+  function profileAt(c, side, along, i, out) {
+    // pixel at depth i from the given edge, averaged across 3 px along the edge
+    const d = c.data; let r = 0, g = 0, b = 0;
+    for (let j = -1; j <= 1; j++) {
+      let x, y;
+      if (side === 0) { x = i; y = along + j; } else if (side === 1) { x = W - 1 - i; y = along + j; }
+      else if (side === 2) { x = along + j; y = i; } else { x = along + j; y = H - 1 - i; }
+      x = clamp(x, 0, W - 1); y = clamp(y, 0, H - 1); const p = (y * W + x) * 4; r += d[p]; g += d[p + 1]; b += d[p + 2];
+    }
+    out[0] = r / 3; out[1] = g / 3; out[2] = b / 3; return out;
+  }
+  // Largest sustained rise in an averaged distance profile (border colour -> frame).
+  function meanStep(d, minD, maxD) {
+    if (!d.length) return null; let best = 0, at = -1;
+    for (let i = minD + 3; i < maxD - 3; i++) {
+      const before = (d[i - 3] + d[i - 2] + d[i - 1]) / 3, after = (d[i + 1] + d[i + 2] + d[i + 3]) / 3, step = after - before;
+      if (step > best) { best = step; at = i; }
+    }
+    return best > 10 ? at + 0.5 : null;
+  }
+  // side: 0=L 1=R 2=T 3=B
+  function borderSide(c, side) {
+    const n = 41, maxD = 11 * MM, minD = Math.round(1.0 * MM), res = [], bcs = [];
+    const span = side < 2 ? H : W, prof = [], meanD = [];
+    for (let k = 0; k < n; k++) {
+      const along = Math.round(span * (0.14 + 0.72 * k / (n - 1)));
+      prof.length = 0;
+      for (let i = 0; i <= maxD + 3; i++) prof.push(profileAt(c, side, along, i, [0, 0, 0]));
+      const s0 = Math.round(0.45 * MM), s1 = Math.round(1.1 * MM);
+      const bc = [0, 1, 2].map(ch => median(prof.slice(s0, s1 + 1).map(v => v[ch])));
+      const d = prof.map(v => cdist(v, bc));
+      for (let i = 0; i < d.length; i++) meanD[i] = (meanD[i] || 0) + d[i] / n;
+      const ds = d.map((v, i) => (d[Math.max(0, i - 1)] + v + d[Math.min(d.length - 1, i + 1)]) / 3);
+      const thr = Math.max(26, 0.45 * pct(ds.slice(minD, maxD), 0.9));
+      let e = -1;
+      for (let i = minD; i < maxD; i++) if (ds[i] > thr && ds[i + 1] > thr && ds[i + 2] > thr) { e = i; break; }
+      if (e < 0) continue;
+      const base = median(ds.slice(Math.round(0.4 * MM), Math.max(Math.round(0.4 * MM) + 2, e - 2)));
+      const plat = median(ds.slice(e, e + 6)), lvl = (base + plat) / 2;
+      let pos = e;
+      for (let i = Math.max(1, e - 4); i <= e + 3; i++) { if (ds[i - 1] <= lvl && ds[i] > lvl) { pos = i - 1 + (lvl - ds[i - 1]) / (ds[i] - ds[i - 1] || 1); break; } }
+      res.push(pos + 0.5); bcs.push(bc);
+    }
+    const color = bcs.length ? [0, 1, 2].map(ch => median(bcs.map(v => v[ch]))) : [128, 128, 128];
+    const meanPos = meanStep(meanD, minD, maxD);
+    if (res.length < 6) return meanPos ? { px: meanPos, mm: meanPos / MM, conf: 0.3, spread: 0, samples: res, color, via: 'mean' } : { px: null, conf: 0, samples: res, color };
+    const m = median(res), mad = median(res.map(v => Math.abs(v - m)));
+    const tol = Math.max(1.5, 2.5 * mad), inl = res.filter(v => Math.abs(v - m) <= tol);
+    let px = inl.reduce((a, b) => a + b, 0) / inl.length, conf = inl.length / n, via = 'lines';
+    // Low agreement between scan lines: fall back to the step in the averaged profile.
+    if (conf < 0.5 && meanPos) { px = meanPos; via = 'mean'; conf = Math.max(conf, 0.35); }
+    return { px, mm: px / MM, conf, spread: mad / MM, samples: res, color, via };
+  }
+  function measureBorders(c) {
+    const s = [0, 1, 2, 3].map(i => borderSide(c, i));
+    return { L: s[0], R: s[1], T: s[2], B: s[3] };
+  }
+  function share(a, b) { return 100 * Math.max(a, b) / (a + b); }
+  function centering(b) {
+    const lr = share(b.L, b.R), tb = share(b.T, b.B);
+    return { lr: b.L >= b.R ? [lr, 100 - lr] : [100 - lr, lr], tb: b.T >= b.B ? [tb, 100 - tb] : [100 - tb, tb], lrWorst: lr, tbWorst: tb, worst: Math.max(lr, tb) };
+  }
+
+  // --- Corners / edges whitening and border-surface anomalies ---
+  function insideDist(x, y) {
+    const r = R_MM * MM, px = x + 0.5, py = y + 0.5;
+    const inX = px < r || px > W - r, inY = py < r || py > H - r;
+    if (inX && inY) { const cx = px < r ? r : W - r, cy = py < r ? r : H - r; return r - Math.hypot(px - cx, py - cy); }
+    return Math.min(px, W - px, py, H - py);
+  }
+  function analyzeCondition(c, borders) {
+    const d = c.data, Z = 6 * MM; // corner zone size
+    const bw = { L: borders.L.px || 30, R: borders.R.px || 30, T: borders.T.px || 30, B: borders.B.px || 30 };
+    const col = { L: borders.L.color, R: borders.R.color, T: borders.T.color, B: borders.B.color };
+    const cz = [[0, 0], [0, 0], [0, 0], [0, 0]], ez = [[0, 0], [0, 0], [0, 0], [0, 0]]; // [white, total]
+    const cg = [0, 0, 0, 0];  // glare-like pixels deeper in border near each corner
+    const mask = new Uint8Array(W * H); // 1 whitening, 2 surface anomaly, 3 glare
+    let surfA = 0, surfN = 0, glare = 0, tot = 0;
+    const s0 = 0.25 * MM, s1 = 1.0 * MM;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const dd = insideDist(x, y); if (dd < 0) continue;
+      const p = (y * W + x) * 4, r = d[p], g = d[p + 1], b = d[p + 2], mn = Math.min(r, g, b), mx = Math.max(r, g, b);
+      tot++;
+      if (mn > 246 && mx >= 252) { glare++; }
+      // nearest side
+      const dl = x, dr = W - 1 - x, dt = y, db = H - 1 - y, m = Math.min(dl, dr, dt, db);
+      const side = m === dl ? 'L' : m === dr ? 'R' : m === dt ? 'T' : 'B';
+      const bc = col[side];
+      const corner = (x < Z || x >= W - Z) && (y < Z || y >= H - Z) ? (y < Z ? (x < Z ? 0 : 1) : (x < Z ? 3 : 2)) : -1;
+      if (dd >= s0 && dd <= s1) {
+        const m0 = Math.min(bc[0], bc[1], bc[2]), L0 = (bc[0] + bc[1] + bc[2]) / 3, L = (r + g + b) / 3;
+        const wh = (mn - m0) / (256 - m0);
+        const white = wh > 0.35 && L > L0 && mn > 150;
+        if (white) mask[y * W + x] = 1;
+        if (corner >= 0) { cz[corner][1]++; if (white) cz[corner][0]++; }
+        else { const ei = side === 'T' ? 0 : side === 'R' ? 1 : side === 'B' ? 2 : 3; ez[ei][1]++; if (white) ez[ei][0]++; }
+      } else if (dd > 1.3 * MM && m < bw[side] - 0.6 * MM) {
+        // inside the plain border band: look for spots / scratches / glare
+        surfN++;
+        const dist = cdist([r, g, b], bc);
+        if (mn > 246 && mx >= 252) { mask[y * W + x] = 3; if (corner >= 0) cg[corner]++; }
+        else if (dist > 55) { surfA++; mask[y * W + x] = 2; }
+      }
+    }
+    return {
+      corners: cz.map((v, i) => ({ frac: v[1] ? v[0] / v[1] : 0, glare: cg[i] > 25 })),
+      edges: ez.map(v => ({ frac: v[1] ? v[0] / v[1] : 0 })),
+      surface: { frac: surfN ? surfA / surfN : 0 },
+      glare: tot ? glare / tot : 0,
+      mask
+    };
+  }
+
+  function stillQuality(det, c) {
+    // brightness on canonical image
+    const d = c.data; let s = 0, n = 0;
+    for (let y = 0; y < H; y += 4) for (let x = 0; x < W; x += 4) { const p = (y * W + x) * 4; s += (d[p] + d[p + 1] + d[p + 2]) / 3; n++; }
+    const st = det.stats;
+    return {
+      brightness: s / n,
+      pxPerMm: st.pxPerMm,
+      keystone: Math.max(Math.abs(1 - st.keyV), Math.abs(1 - st.keyH)),
+      angle: st.angle,
+      edgeWidthMm: det.edgeWidthMm,
+      conf: det.conf
+    };
+  }
+
+  const api = { findCardQuad, MM, CW, CH, W, H, R_MM, mkImg, median, downscale, sample, homography, applyH, warp, roughQuad, detectCard, refine, quadStats, toCanonical, measureBorders, borderSide, centering, share, analyzeCondition, stillQuality, insideDist, orderPortrait, rng };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CV = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* PreGrade grade estimator. Inputs are measurements; outputs are per-company estimates. */
+(function (root) {
+  'use strict';
+  const fh = v => Math.floor(v * 2 + 1e-9) / 2;
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  function interp(tab, x) { // tab: [[x,y],...] ascending x
+    if (x <= tab[0][0]) return tab[0][1];
+    for (let i = 1; i < tab.length; i++) if (x <= tab[i][0]) { const [x0, y0] = tab[i - 1], [x1, y1] = tab[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); }
+    return tab[tab.length - 1][1];
+  }
+  // Defect fraction -> points (100..1000). Heuristic calibration, see notes in the app.
+  const MAP = {
+    corner: [[0, 1000], [0.004, 985], [0.012, 950], [0.03, 900], [0.06, 850], [0.10, 800], [0.15, 750], [0.22, 700], [0.30, 600], [0.40, 500], [0.6, 300], [1, 100]],
+    edge: [[0, 1000], [0.002, 985], [0.006, 950], [0.015, 900], [0.03, 850], [0.06, 800], [0.10, 750], [0.16, 700], [0.25, 600], [0.4, 400], [1, 100]],
+    surface: [[0, 1000], [0.0015, 985], [0.004, 950], [0.01, 900], [0.02, 850], [0.04, 800], [0.08, 750], [0.15, 650], [0.3, 450], [1, 100]]
+  };
+  const sub = pts => pts >= 980 ? 10 : clamp(fh(pts / 100), 1, 9.5);
+
+  // Centering tables: worst-axis larger share (e.g. 55 means 55/45). Checked 2026-11-20.
+  const STANDARDS = {
+    checked: '20 Nov 2026',
+    PSA: { rows: [[10, 55, 75], [9, 60, 90], [8, 65, 90], [7, 70, 90], [6, 80, 90], [5, 85, 90], [3, 90, 90], [2, 100, 100]] },
+    BGS: { rows: [[10, 52, 55], [9.5, 55, 60], [9, 60, 65], [8.5, 65, 70], [8, 70, 75], [7, 75, 80], [6, 80, 85], [5, 85, 90], [4, 90, 95], [3, 100, 100]] },
+    CGC: { rows: [[10, 55, 75], [9.5, 57.5, 80], [9, 60, 90], [8.5, 62.5, 90], [8, 65, 90], [7, 70, 90], [6.5, 72.5, 90], [6, 75, 90], [5, 80, 90], [4.5, 85, 90], [3.5, 90, 95], [1, 100, 100]], pristine: [51, 52] },
+    SGC: { rows: [[10, 55, 70], [9.5, 60, 80], [9, 65, 90], [8, 70, 90], [7, 75, 90], [6, 80, 90], [5, 85, 90], [4, 90, 90], [1, 100, 100]], pristine: [51, 55] },
+    TAG: { gemFront: 55, gemBackTCG: 65 }
+  };
+  function cap(rows, f, b) { for (const [g, mf, mb] of rows) if (f <= mf + 0.25 && b <= mb + 0.25) return g; return 1; }
+
+  const NAMES = {
+    PSA: { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' },
+    BGS: { 10: 'Pristine', 9.5: 'Gem Mint', 9: 'Mint', 8.5: 'NM-MT+', 8: 'NM-MT', 7.5: 'NM+', 7: 'NM', 6.5: 'EX-MT+', 6: 'EX-MT', 5.5: 'EX+', 5: 'EX', 4.5: 'VG-EX+', 4: 'VG-EX', 3.5: 'VG+', 3: 'VG', 2.5: 'G+', 2: 'Good', 1.5: 'Fair', 1: 'Poor' },
+    CGC: { 10: 'Gem Mint', 9.5: 'Mint+', 9: 'Mint', 8.5: 'NM/Mint+', 8: 'NM/Mint', 7.5: 'Near Mint+', 7: 'Near Mint', 6.5: 'Ex/NM+', 6: 'Ex/NM', 5.5: 'Excellent+', 5: 'Excellent', 4.5: 'VG/Ex+', 4: 'VG/Ex', 3.5: 'Very Good+', 3: 'Very Good', 2.5: 'Good+', 2: 'Good', 1.5: 'Fair', 1: 'Poor' },
+    SGC: { 10: 'Gem Mint', 9.5: 'Mint+', 9: 'Mint', 8.5: 'NM-MT+', 8: 'NM-MT', 7.5: 'NM+', 7: 'NM', 6.5: 'EX-NM+', 6: 'EX-NM', 5.5: 'EX+', 5: 'EX', 4.5: 'VG-EX+', 4: 'VG-EX', 3.5: 'VG+', 3: 'VG', 2.5: 'G+', 2: 'Good', 1.5: 'Fair', 1: 'Poor' },
+    TAG: { 10: 'Gem Mint', 9.5: 'Mint+', 9: 'Mint', 8.5: 'NM-MT+', 8: 'NM-MT', 7.5: 'NM+', 7: 'NM', 6.5: 'EX-MT+', 6: 'EX-MT', 5.5: 'EX+', 5: 'EX', 4.5: 'VG-EX+', 4: 'VG-EX', 3.5: 'VG+', 3: 'VG', 2.5: 'G+', 2: 'Good', 1.5: 'Fair', 1: 'Poor' }
+  };
+  const fmt = g => (g % 1 ? g.toFixed(1) : String(g));
+
+  // m: {front:{cent:{worst}, cornerFr:[4], edgeFr:[4], surfFr}, back:{...}, flags:{crease,dent,scratch,printline,stain}, ai:{corners,edges,surface} points or null}
+  function categoryPoints(m) {
+    const side = s => ({
+      corners: s.cornerFr.map(f => interp(MAP.corner, f)),
+      edges: s.edgeFr.map(f => interp(MAP.edge, f)),
+      surface: interp(MAP.surface, s.surfFr)
+    });
+    const F = side(m.front), B = m.back ? side(m.back) : null;
+    const comb = (a, b) => b == null ? a : 0.7 * Math.min(a, b) + 0.3 * Math.max(a, b);
+    const worstMix = arr => 0.7 * Math.min(...arr) + 0.3 * arr.reduce((x, y) => x + y, 0) / arr.length;
+    let corners = comb(worstMix(F.corners), B && worstMix(B.corners));
+    let edges = comb(worstMix(F.edges), B && worstMix(B.edges));
+    let surface = comb(F.surface, B && B.surface);
+    const fl = m.flags || {};
+    const caps = { crease: 500, dent: 750, stain: 700, scratch: 850, printline: 900 };
+    for (const k in caps) if (fl[k]) surface = Math.min(surface, caps[k]);
+    if (m.ai && m.useAi) {
+      if (m.ai.corners != null) corners = Math.min(corners, m.ai.corners);
+      if (m.ai.edges != null) edges = Math.min(edges, m.ai.edges);
+      if (m.ai.surface != null) surface = Math.min(surface, m.ai.surface);
+    }
+    return { corners, edges, surface, perSide: { F, B } };
+  }
+
+  function estimate(m) {
+    const P = categoryPoints(m);
+    const fW = m.front.cent.worst, bW = m.back ? m.back.cent.worst : 50;
+    const cs = { corners: sub(P.corners), edges: sub(P.edges), surface: sub(P.surface) };
+    const vals = [cs.corners, cs.edges, cs.surface], mn = Math.min(...vals), avg = vals.reduce((a, b) => a + b, 0) / 3;
+    const out = [];
+    const limiter = (centCap, condG) => centCap < condG ? 'Centering' : (['Corners', 'Edges', 'Surface'][vals.indexOf(mn)]);
+
+    // PSA: no subgrades; the weakest factor sets the grade.
+    { const c = cap(STANDARDS.PSA.rows, fW, bW), cond = mn >= 9.5 && avg >= 9.75 ? 10 : Math.max(1, Math.floor(mn));
+      const g = Math.min(c, cond);
+      out.push({ co: 'PSA', grade: g, label: `${NAMES.PSA[g]} ${g}`, limit: g === 10 ? '—' : limiter(c, cond), centCap: c,
+        note: fW > 55.25 && fW <= 60.25 && cond === 10 ? 'Front centering is between 55/45 and 60/40, so a 10 is a coin flip' : '' }); }
+
+    // BGS: four subgrades, overall from the average with the lowest subgrade as a brake.
+    { const cSub = cap(STANDARDS.BGS.rows, fW, bW), subs = [cSub, cs.corners, cs.edges, cs.surface];
+      const a = subs.reduce((x, y) => x + y, 0) / 4, lo = Math.min(...subs);
+      let g = Math.min(fh(a + 0.125), lo + 1); g = clamp(g, 1, 10);
+      const black = subs.every(v => v === 10);
+      out.push({ co: 'BGS', grade: g, label: black ? 'Black Label 10' : `${NAMES.BGS[g]} ${fmt(g)}`, limit: g >= 10 ? '—' : ['Centering', 'Corners', 'Edges', 'Surface'][subs.indexOf(lo)], subs,
+        note: `Subgrades C ${fmt(cSub)} · Co ${fmt(cs.corners)} · E ${fmt(cs.edges)} · S ${fmt(cs.surface)}` }); }
+
+    // CGC and SGC: half-point scales, no subgrades on the label.
+    for (const co of ['CGC', 'SGC']) {
+      const S = STANDARDS[co], c = cap(S.rows, fW, bW);
+      const cond = mn >= 9.5 && avg >= 9.75 ? 10 : clamp(fh(0.6 * mn + 0.4 * avg), 1, 9.5);
+      const g = Math.min(c, cond);
+      const pristine = g === 10 && vals.every(v => v === 10) && fW <= S.pristine[0] && bW <= S.pristine[1];
+      out.push({ co, grade: g, label: pristine ? 'Pristine 10' : `${NAMES[co][g]} ${fmt(g)}`, limit: g === 10 ? (pristine ? '—' : 'Pristine needs ~50/50') : limiter(c, cond), centCap: c, note: '' });
+    }
+
+    // TAG: 1000-point score. Gem Mint 10 = 950-989, Pristine = 990+, 900-949 = 9, then 50 points per half grade.
+    { const cf = clamp(1000 - 10 * (fW - 50), 100, 1000), cb = clamp(1000 - (50 / 15) * (bW - 50), 100, 1000);
+      const cats = [cf, cb, P.corners, P.edges, P.surface], w = [0.16, 0.09, 0.25, 0.25, 0.25];
+      let score = cats.reduce((s, v, i) => s + v * w[i], 0);
+      score = Math.round(Math.min(score, Math.min(...cats) + 60));
+      const g = score >= 950 ? 10 : clamp(Math.floor(score / 50) / 2, 1, 9.5);
+      const names = ['Front centering', 'Back centering', 'Corners', 'Edges', 'Surface'];
+      out.push({ co: 'TAG', grade: g, score, label: score >= 990 ? `Pristine 10 · ${score}` : `${NAMES.TAG[g]} ${fmt(g)} · ${score}`, limit: score >= 990 ? '—' : names[cats.indexOf(Math.min(...cats))], note: '' });
+    }
+
+    // Opinionated call: the slab most likely to read best for a Pokémon card.
+    const pref = { PSA: 5, CGC: 4, BGS: 3, TAG: 2, SGC: 1 };
+    const norm = r => r.co === 'BGS' ? r.grade + 0.5 : r.grade; // BGS 9.5 trades like other graders' 10
+    const best = out.slice().sort((a, b) => (norm(b) - norm(a)) || (pref[b.co] - pref[a.co]))[0];
+    return { results: out, points: P, subs: cs, best, centering: { front: fW, back: bW } };
+  }
+
+  const api = { estimate, STANDARDS, MAP, interp, sub, fmt, NAMES };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.GRADE = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* Synthetic demo card + photo generator (used for the in-app example and for tests). */
+(function (root) {
+  'use strict';
+  const K = 12; // px per mm when drawing the card face
+
+  function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  // spec: {L,R,T,B} border widths in mm, wear: [{corner:0..3, amt}], nick:{edge, at, len}
+  function makeCardCanvas(createCanvas, side, spec) {
+    const w = 63 * K, h = 88 * K, cv = createCanvas(w, h), ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    rr(ctx, 0, 0, w, h, 3 * K); ctx.save(); ctx.clip();
+    const L = spec.L * K, R = spec.R * K, T = spec.T * K, B = spec.B * K;
+    if (side === 'front') {
+      ctx.fillStyle = '#F1CB2E'; ctx.fillRect(0, 0, w, h);
+      const fw = w - L - R, fh = h - T - B;
+      const g = ctx.createLinearGradient(0, T, 0, h - B); g.addColorStop(0, '#9fd3a5'); g.addColorStop(1, '#5aa27a');
+      rr(ctx, L, T, fw, fh, 1.2 * K); ctx.fillStyle = g; ctx.fill();
+      // name bar
+      ctx.fillStyle = '#1d2a22'; ctx.font = `bold ${4 * K}px sans-serif`; ctx.fillText('Mossling', L + 3 * K, T + 6 * K);
+      ctx.font = `bold ${3.2 * K}px sans-serif`; ctx.fillText('HP 70', L + fw - 15 * K, T + 6 * K);
+      // art window
+      const ax = L + 3 * K, ay = T + 8 * K, aw = fw - 6 * K, ah = 36 * K;
+      ctx.fillStyle = '#c9b06a'; ctx.fillRect(ax - 0.8 * K, ay - 0.8 * K, aw + 1.6 * K, ah + 1.6 * K);
+      const sky = ctx.createLinearGradient(0, ay, 0, ay + ah); sky.addColorStop(0, '#7ec8f0'); sky.addColorStop(0.65, '#d6f1ff'); sky.addColorStop(0.66, '#7fbf5e'); sky.addColorStop(1, '#3f8b3e');
+      ctx.fillStyle = sky; ctx.fillRect(ax, ay, aw, ah);
+      ctx.fillStyle = '#3d7b47'; ctx.beginPath(); ctx.ellipse(ax + aw * 0.5, ay + ah * 0.62, aw * 0.22, ah * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f4f9ef'; ctx.beginPath(); ctx.arc(ax + aw * 0.44, ay + ah * 0.55, 2.2 * K, 0, 7); ctx.arc(ax + aw * 0.56, ay + ah * 0.55, 2.2 * K, 0, 7); ctx.fill();
+      ctx.fillStyle = '#18211b'; ctx.beginPath(); ctx.arc(ax + aw * 0.44, ay + ah * 0.56, 1 * K, 0, 7); ctx.arc(ax + aw * 0.56, ay + ah * 0.56, 1 * K, 0, 7); ctx.fill();
+      // attack text blocks
+      ctx.fillStyle = 'rgba(20,35,25,.75)';
+      for (let i = 0; i < 6; i++) ctx.fillRect(L + 4 * K, T + 49 * K + i * 4.2 * K, fw * (i % 3 === 0 ? 0.55 : 0.8), 1.6 * K);
+      ctx.font = `${2 * K}px sans-serif`; ctx.fillText('Illus. Demo   001/100', L + 3 * K, h - B - 2.2 * K);
+    } else {
+      ctx.fillStyle = '#2C5FB4'; ctx.fillRect(0, 0, w, h);
+      const fw = w - L - R, fh = h - T - B;
+      const g = ctx.createRadialGradient(w / 2, h / 2, 2 * K, w / 2, h / 2, 40 * K);
+      g.addColorStop(0, '#a9d2ff'); g.addColorStop(0.3, '#4a8be0'); g.addColorStop(0.75, '#16397e'); g.addColorStop(1, '#0a1d47');
+      ctx.save(); ctx.beginPath(); ctx.rect(L, T, fw, fh); ctx.clip();
+      ctx.fillStyle = g; ctx.fillRect(L, T, fw, fh);
+      ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1.4 * K;
+      for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(w / 2, h / 2, (6 + i * 5) * K, i * 0.7, i * 0.7 + 2.4); ctx.stroke(); }
+      ctx.fillStyle = '#f5f7fb'; ctx.font = `bold ${6 * K}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('PREGRADE', w / 2, h / 2 + 2 * K);
+      ctx.textAlign = 'start'; ctx.restore();
+    }
+    ctx.restore();
+    // wear: whitening along the outer edge near chosen corners
+    ctx.save(); rr(ctx, 0, 0, w, h, 3 * K); ctx.clip();
+    ctx.strokeStyle = '#f7f5ee';
+    for (const wr of (spec.wear || [])) {
+      ctx.lineWidth = wr.amt * K; const r = 3 * K;
+      const cx = wr.corner === 0 || wr.corner === 3 ? r : w - r, cy = wr.corner < 2 ? r : h - r;
+      const a0 = [Math.PI, 1.5 * Math.PI, 0, 0.5 * Math.PI][wr.corner];
+      ctx.beginPath(); ctx.arc(cx, cy, r, a0 + 0.15, a0 + Math.PI / 2 - 0.15); ctx.stroke();
+    }
+    if (spec.nick) { ctx.fillStyle = '#f7f5ee'; const n = spec.nick; if (n.edge === 2) ctx.fillRect(n.at * K, h - n.depth * K, n.len * K, n.depth * K); else ctx.fillRect(w - n.depth * K, n.at * K, n.depth * K, n.len * K); }
+    ctx.restore();
+    return cv;
+  }
+
+  // Compose a "photo": background + card placed by quad (perspective), noise, mild blur.
+  function composePhoto(card, quad, pw, ph, seed, CV, bgImg) {
+    const out = CV.mkImg(pw, ph), o = out.data;
+    let s = seed >>> 0 || 7; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    // inverse homography photo -> card
+    const Hm = CV.homography(quad, [[0, 0], [card.width, 0], [card.width, card.height], [0, card.height]]);
+    const t = [0, 0, 0], cd = card.data, cw = card.width, ch = card.height;
+    for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
+      const p = (y * pw + x) * 4;
+      let r, g, b;
+      if (bgImg) { const q = p; r = bgImg.data[q]; g = bgImg.data[q + 1]; b = bgImg.data[q + 2]; }
+      else { const v = 38 + 14 * (x / pw) + 10 * (y / ph); r = v - 4; g = v; b = v + 8; }
+      // supersample 2x2 for clean edges
+      let ar = 0, ag = 0, ab = 0, aa = 0;
+      for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++) {
+        const u = CV.applyH(Hm, x + 0.25 + sx * 0.5, y + 0.25 + sy * 0.5);
+        if (u[0] >= 0 && u[1] >= 0 && u[0] < cw && u[1] < ch) {
+          const q = ((u[1] | 0) * cw + (u[0] | 0)) * 4, a = cd[q + 3] / 255;
+          ar += cd[q] * a; ag += cd[q + 1] * a; ab += cd[q + 2] * a; aa += a;
+        }
+      }
+      const a = aa / 4; r = r * (1 - a) + ar / 4; g = g * (1 - a) + ag / 4; b = b * (1 - a) + ab / 4;
+      const nz = (rnd() - 0.5) * 7;
+      o[p] = r + nz; o[p + 1] = g + nz; o[p + 2] = b + nz; o[p + 3] = 255;
+    }
+    // 3x3 box blur, light (lens softness)
+    const c2 = new Uint8ClampedArray(o);
+    for (let y = 1; y < ph - 1; y++) for (let x = 1; x < pw - 1; x++) for (let c = 0; c < 3; c++) {
+      const p = (y * pw + x) * 4 + c;
+      o[p] = (c2[p] * 4 + c2[p - 4] + c2[p + 4] + c2[p - pw * 4] + c2[p + pw * 4]) / 8;
+    }
+    return out;
+  }
+
+  const DEMO = {
+    front: { L: 3.35, R: 2.65, T: 3.0, B: 3.2, wear: [{ corner: 1, amt: 1.0 }], nick: { edge: 2, at: 40, len: 1.2, depth: 0.45 } },
+    back: { L: 4.6, R: 3.6, T: 4.2, B: 4.4, wear: [{ corner: 2, amt: 1.3 }, { corner: 3, amt: 0.8 }] },
+    frontQuad: [[262, 196], [1018, 214], [1031, 1262], [246, 1250]],
+    backQuad: [[250, 205], [1010, 190], [1028, 1240], [240, 1258]],
+    pw: 1280, ph: 1460
+  };
+
+  const api = { K, makeCardCanvas, composePhoto, DEMO };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.DEMO = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const MAXDIM = 2200;
+const state = { step: 'front', sides: { front: null, back: null }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: false, editing: false, savedId: null };
+let sampleApi = null;
+
+/* ---------- views ---------- */
+function show(view) {
+  for (const v of ['home', 'capture', 'review', 'results']) $('#' + v).hidden = v !== view;
+  $('#steps').hidden = view === 'home'; document.querySelector('header.top').classList.toggle('inflow', view !== 'home');
+  const order = ['front', 'back', 'results'], curS = view === 'results' ? 'results' : state.step;
+  document.querySelectorAll('#steps i').forEach(i => { const k = order.indexOf(i.dataset.s), c = order.indexOf(curS); i.className = k === c ? 'on' : k < c ? 'done' : ''; });
+  if (view !== 'capture') stopCamera();
+  window.scrollTo(0, 0);
+}
+function busy(msg) { $('#busy-msg').textContent = msg || 'Measuring…'; $('#busy').hidden = !msg; }
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+
+/* ---------- images ---------- */
+function canvasOf(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function drawToImg(src, sw, sh, crop) {
+  crop = crop || { sx: 0, sy: 0, sw, sh };
+  const s = Math.min(1, MAXDIM / Math.max(crop.sw, crop.sh));
+  const c = canvasOf(Math.round(crop.sw * s), Math.round(crop.sh * s)), x = c.getContext('2d');
+  x.drawImage(src, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, c.width, c.height);
+  return { img: x.getImageData(0, 0, c.width, c.height), canvas: c, scale: s };
+}
+async function fileToImg(file) {
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Could not read that image')); im.src = URL.createObjectURL(file); }); }
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
+  return drawToImg(src, w, h);
+}
+function putImg(canvas, img) { canvas.width = img.width; canvas.height = img.height; canvas.getContext('2d').putImageData(new ImageData(img.data, img.width, img.height), 0, 0); }
+function defaultQuad(img) { const h = img.height * 0.78, w = h * 63 / 88, x = (img.width - w) / 2, y = (img.height - h) / 2; return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]; }
+
+/* ---------- processing ---------- */
+function processSide(loaded, rough) {
+  const img = loaded.img;
+  let det = rough ? CV.detectCard(img, { rough, band: Math.max(10, Math.max(img.width, img.height) * 0.015), near: true }) : null;
+  if (!det || !det.ok) det = CV.detectCard(img);
+  const side = { img, photo: loaded.canvas, det, quad: det.quad || defaultQuad(img), auto: !!det.quad };
+  measure(side, true);
+  return side;
+}
+function measure(side, reBorders) {
+  side.canon = CV.toCanonical(side.img, side.quad);
+  if (reBorders || !side.b) {
+    side.bInfo = CV.measureBorders(side.canon);
+    const fb = { L: 30, R: 30, T: 30, B: 30 };
+    side.b = {}; for (const k of ['L', 'R', 'T', 'B']) side.b[k] = side.bInfo[k].px || fb[k];
+    side.bAuto = Object.assign({}, side.b);
+    side.quadAuto = side.quad.map(p => p.slice());
+  }
+  side.view = null;
+  analyze(side);
+}
+function analyze(side) {
+  const bi = side.bInfo, b = {};
+  for (const k of ['L', 'R', 'T', 'B']) b[k] = { px: side.b[k], color: bi[k].color };
+  side.cond = CV.analyzeCondition(side.canon, b);
+  side.cent = CV.centering(side.b);
+  side.dirs = { lr: direction(side.b.L, side.b.R, 'left', 'right', 'right', 'left'), tb: direction(side.b.T, side.b.B, 'top', 'bottom', 'low', 'high') };
+  side.stats = CV.quadStats(side.quad);
+  side.warnings = warningsFor(side);
+}
+function warningsFor(s) {
+  const w = [], st = s.stats, det = s.det;
+  if (!s.auto) w.push(['bad', "Couldn't find the card's edges. Drag the four corners onto the card, or retake on a darker, plain background."]);
+  else if (!det.ok || det.conf < 0.7) w.push(['warn', 'The card outline is uncertain. Check that the straightened card has no background showing at its edges.']);
+  if (st.pxPerMm < 5) w.push(['bad', `Low detail (${st.pxPerMm.toFixed(1)} px/mm). Move closer so the card fills the frame.`]);
+  else if (st.pxPerMm < 8) w.push(['warn', `Detail is ${st.pxPerMm.toFixed(1)} px/mm. Closer gives finer measurements.`]);
+  if (det.edgeWidthMm && det.edgeWidthMm > 0.7) w.push(['bad', 'The photo is blurry. Tap to focus on the card and hold still.']);
+  else if (det.edgeWidthMm && det.edgeWidthMm > 0.45) w.push(['warn', 'The photo is a little soft. A sharper shot makes corner checks more reliable.']);
+  const key = Math.max(Math.abs(1 - st.keyV), Math.abs(1 - st.keyH));
+  if (key > 0.08) w.push(['warn', 'The phone was at an angle. Measurements are corrected for it, but a flat-on shot is more accurate.']);
+  if (s.cond.glare > 0.004) w.push(['warn', `Glare covers ${(s.cond.glare * 100).toFixed(1)}% of the card. Move the light to the side, then retake.`]);
+  const cg = s.cond.corners.map((c, i) => c.glare ? ['top-left', 'top-right', 'bottom-right', 'bottom-left'][i] : null).filter(Boolean);
+  if (cg.length) w.push(['warn', `Glare near the ${cg.join(' and ')} corner, so whitening there may be over-counted.`]);
+  const low = ['L', 'R', 'T', 'B'].filter(k => s.bInfo[k].conf < 0.5).map(k => ({ L: 'left', R: 'right', T: 'top', B: 'bottom' })[k]);
+  if (low.length) w.push(['warn', `Check the ${low.join(', ')} line${low.length > 1 ? 's' : ''}. The border edge there was hard to read.`]);
+  if (!w.length) w.push(['ok', 'Photo quality is good.']);
+  return w;
+}
+
+/* ---------- capture ---------- */
+const cam = { track: null, seed: null, worker: null, wBusy: false, lastSearch: 0, stream: null, video: null, raf: 0, lastA: 0, okSince: 0, prev: null, lap: [], busy: false, det: null, guide: null, crop: null, AW: 360 };
+async function openCapture(step) {
+  state.step = step; show('capture');
+  $('#cap-title').textContent = step === 'front' ? 'Photograph the front' : 'Now the back';
+  $('#skip-back').hidden = step !== 'back';
+  await startCamera();
+}
+async function startCamera() {
+  stopCamera();
+  const fail = msg => { $('#live').hidden = true; $('#nolive').hidden = false; if (msg) $('#nolive-msg').textContent = msg; };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return fail();
+  try {
+    cam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1920 } }, audio: false });
+  } catch (e) { return fail(); }
+  if ($('#capture').hidden) { stopCamera(); return; }
+  cam.video = document.createElement('video'); cam.video.playsInline = true; cam.video.muted = true; cam.video.srcObject = cam.stream;
+  try { await cam.video.play(); } catch (e) { stopCamera(); return fail(); }
+  $('#live').hidden = false; $('#nolive').hidden = true;
+  cam.okSince = 0; cam.prev = null; cam.lap = []; cam.det = null; cam.track = null; cam.seed = null; cam.anchor = null; startWorker();
+  cam.raf = requestAnimationFrame(frame);
+}
+function stopCamera() {
+  cancelAnimationFrame(cam.raf); cam.raf = 0;
+  if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+  cam.stream = null; cam.video = null;
+}
+// Full card search runs in a background worker; between searches the card is tracked frame to frame.
+function startWorker() {
+  if (cam.worker || cam.workerFailed) return;
+  try {
+    const src = document.getElementById('cv-src').textContent + `
+      onmessage = e => { const d = e.data, img = { width: d.w, height: d.h, data: new Uint8ClampedArray(d.buf) };
+        let r = null; try { r = CV.findCardQuad(img, 360); } catch (err) {}
+        postMessage({ quad: r && r.quad, score: r ? r.score : 0, k: d.k }); };`;
+    cam.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    cam.worker.onmessage = e => { cam.wBusy = false; if (e.data.quad && e.data.score > 0.2 && e.data.k === cam.AW) cam.seed = e.data.quad; };
+    cam.worker.onerror = () => { cam.workerFailed = true; cam.worker = null; cam.wBusy = false; };
+  } catch (e) { cam.workerFailed = true; cam.worker = null; }
+}
+const level = { beta: null, gamma: null, t: 0, on: false };
+function startOrientation() {
+  if (level.on) return; level.on = true;
+  const listen = () => window.addEventListener('deviceorientation', e => { if (e.beta == null) return; level.beta = e.beta; level.gamma = e.gamma; level.t = performance.now(); });
+  try {
+    const D = window.DeviceOrientationEvent;
+    if (D && typeof D.requestPermission === 'function') D.requestPermission().then(r => { if (r === 'granted') listen(); }).catch(() => {});
+    else if (D) listen();
+  } catch (e) {}
+}
+function guideRect(W, H) { let gh = H * 0.8, gw = gh * 63 / 88; if (gw > W * 0.84) { gw = W * 0.84; gh = gw * 88 / 63; } return { x: (W - gw) / 2, y: (H - gh) / 2, w: gw, h: gh }; }
+function frame(t) {
+  cam.raf = requestAnimationFrame(frame);
+  const v = cam.video; if (!v || !v.videoWidth) return;
+  const cv = $('#live-cv'), r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const vr = v.videoWidth / v.videoHeight, cr = W / H; let sx, sy, sw, sh;
+  if (vr > cr) { sh = v.videoHeight; sw = sh * cr; sx = (v.videoWidth - sw) / 2; sy = 0; } else { sw = v.videoWidth; sh = sw / cr; sx = 0; sy = (v.videoHeight - sh) / 2; }
+  cam.crop = { sx, sy, sw, sh, W, H };
+  const x = cv.getContext('2d'); x.drawImage(v, sx, sy, sw, sh, 0, 0, W, H);
+  const g = guideRect(W, H); cam.guide = g;
+  x.fillStyle = 'rgba(10,12,16,.45)'; x.beginPath(); x.rect(0, 0, W, H); x.roundRect ? x.roundRect(g.x, g.y, g.w, g.h, g.w * 0.05) : x.rect(g.x, g.y, g.w, g.h); x.fill('evenodd');
+  const allOk = cam.okSince > 0, L = g.w * 0.12; x.lineWidth = 4 * dpr; x.strokeStyle = allOk ? '#3DDC84' : '#F2C531';
+  x.beginPath();
+  [[g.x, g.y, 1, 1], [g.x + g.w, g.y, -1, 1], [g.x + g.w, g.y + g.h, -1, -1], [g.x, g.y + g.h, 1, -1]].forEach(([px, py, dx, dy]) => { x.moveTo(px + dx * L, py); x.lineTo(px, py); x.lineTo(px, py + dy * L); });
+  x.stroke();
+  if (cam.det && cam.det.quad) {
+    const k = W / cam.AW; x.lineWidth = 2 * dpr; x.strokeStyle = cam.det.good ? '#3DDC84' : 'rgba(255,255,255,.8)';
+    x.beginPath(); cam.det.quad.forEach((p, i) => i ? x.lineTo(p[0] * k, p[1] * k) : x.moveTo(p[0] * k, p[1] * k)); x.closePath(); x.stroke();
+  }
+  if (allOk && $('#auto').checked) {
+    const p = Math.min(1, (performance.now() - cam.okSince) / 900);
+    x.strokeStyle = '#3DDC84'; x.lineWidth = 6 * dpr; x.beginPath(); x.arc(W / 2, H / 2, 26 * dpr, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); x.stroke();
+  }
+  if (t - cam.lastA > 130 && !cam.busy) { cam.lastA = t; analyzeLive(); }
+}
+const an = { c: null, f: null };
+function lapVar(id) {
+  const w = id.width, h = id.height, d = id.data, L = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) L[i] = 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
+  let s = 0, s2 = 0, n = 0;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, v = 4 * L[i] - L[i - 1] - L[i + 1] - L[i - w] - L[i + w]; s += v; s2 += v * v; n++; }
+  return s2 / n - (s / n) * (s / n);
+}
+function analyzeLive() {
+  const v = cam.video, c = cam.crop, g = cam.guide; if (!v || !c || !g) return;
+  cam.busy = true;
+  try {
+    const AW = cam.AW, AH = Math.round(AW * c.H / c.W), k = AW / c.W;
+    an.c = an.c || canvasOf(AW, AH); if (an.c.height !== AH) { an.c.width = AW; an.c.height = AH; }
+    const ax = an.c.getContext('2d', { willReadFrequently: true }); ax.drawImage(v, c.sx, c.sy, c.sw, c.sh, 0, 0, AW, AH);
+    const img = ax.getImageData(0, 0, AW, AH);
+    const gq = [[g.x * k, g.y * k], [(g.x + g.w) * k, g.y * k], [(g.x + g.w) * k, (g.y + g.h) * k], [g.x * k, (g.y + g.h) * k]];
+    let det = null;
+    const tryQ = q => { const d = CV.detectCard(img, { rough: q, band: AH * 0.035, near: true }); return d.quad && d.conf > 0.7 && Math.abs(d.aspect - 63 / 88) < 0.08 ? d : null; };
+    // Snap from the latest full search (the anchor), never from the previous frame, so errors can't accumulate.
+    if (cam.seed) { const d = tryQ(cam.seed); cam.seed = null; if (d) cam.anchor = d.quad; }
+    if (cam.anchor) { det = tryQ(cam.anchor); if (!det) cam.anchor = null; }
+    cam.track = det ? det.quad : null;
+    const nowS = performance.now();
+    if (nowS - cam.lastSearch > 350) {
+      cam.lastSearch = nowS;
+      if (cam.worker && !cam.wBusy) { cam.wBusy = true; const copy = new Uint8ClampedArray(img.data); cam.worker.postMessage({ w: AW, h: AH, buf: copy.buffer, k: AW }, [copy.buffer]); }
+      else if (!cam.worker && (!cam.lastMain || nowS - cam.lastMain > 1500)) { cam.lastMain = nowS; const r = CV.findCardQuad(img, 300); if (r) cam.seed = r.quad; }
+    }
+    if (!det) det = CV.detectCard(img, { rough: gq, band: AH * 0.09 });
+    const checks = [];
+    // steady
+    const lum = []; for (let y = 0; y < AH; y += 6) for (let x = 0; x < AW; x += 6) { const p = (y * AW + x) * 4; lum.push(img.data[p] + img.data[p + 1] + img.data[p + 2]); }
+    let diff = 0; if (cam.prev && cam.prev.length === lum.length) { for (let i = 0; i < lum.length; i++) diff += Math.abs(lum[i] - cam.prev[i]); diff /= lum.length * 3; } else diff = 99;
+    cam.prev = lum;
+    let found = det.quad && det.conf > 0.6 && Math.abs(det.aspect - 63 / 88) < 0.06;
+    let light = 'ok', glare = 'ok', framing = 'bad', straight = 'bad', say = '';
+    if (found) {
+      const q = det.quad, st = det.stats;
+      // brightness & glare inside the card
+      let s = 0, n = 0, gl = 0; const xs = q.map(p => p[0]), ys = q.map(p => p[1]);
+      const x0 = Math.max(0, Math.min(...xs) | 0), x1 = Math.min(AW - 1, Math.max(...xs) | 0), y0 = Math.max(0, Math.min(...ys) | 0), y1 = Math.min(AH - 1, Math.max(...ys) | 0);
+      for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) { const p = (y * AW + x) * 4, d = img.data; const mn = Math.min(d[p], d[p + 1], d[p + 2]); s += (d[p] + d[p + 1] + d[p + 2]) / 3; n++; if (mn > 242) gl++; }
+      const br = s / n, gf = gl / n;
+      light = br < 70 ? 'bad' : br > 215 ? 'warn' : 'ok';
+      glare = gf > 0.012 ? 'bad' : gf > 0.004 ? 'warn' : 'ok';
+      const ch = (st.left + st.right) / 2, gh = g.h * k, cx = xs.reduce((a, b) => a + b) / 4, cy = ys.reduce((a, b) => a + b) / 4;
+      const off = Math.hypot(cx - (g.x + g.w / 2) * k, cy - (g.y + g.h / 2) * k) / gh;
+      framing = ch / gh < 0.82 ? 'small' : ch / gh > 1.1 ? 'big' : off > 0.06 ? 'off' : 'ok';
+      const keyV = st.keyV, keyH = st.keyH;
+      straight = Math.abs(st.angle) > 3 ? 'rot' : Math.abs(1 - keyV) > 0.035 ? (keyV < 1 ? 'top' : 'bottom') : Math.abs(1 - keyH) > 0.035 ? (keyH < 1 ? 'left' : 'right') : 'ok';
+      if (light === 'bad') say = 'More light, please';
+      else if (glare !== 'ok') say = 'Glare on the card. Move the light to one side';
+      else if (framing === 'small') say = 'Move closer';
+      else if (framing === 'big') say = 'Move back a little';
+      else if (framing === 'off') say = 'Center the card in the guide';
+      else if (straight === 'rot') say = 'Turn the card so it sits straight';
+      else if (straight === 'top') say = 'Tilt the phone: the top of the card is farther away';
+      else if (straight === 'bottom') say = 'Tilt the phone: the bottom of the card is farther away';
+      else if (straight === 'left' || straight === 'right') say = `Tilt the phone: the ${straight} side is farther away`;
+    } else say = 'Line the card up inside the yellow guide';
+    // focus on full-res centre of the guide
+    an.f = an.f || canvasOf(256, 256);
+    const fx = an.f.getContext('2d', { willReadFrequently: true }), vx = c.sx + (g.x + g.w / 2) / c.W * c.sw - 128, vy = c.sy + (g.y + g.h * 0.3) / c.H * c.sh - 128;
+    fx.drawImage(v, vx, vy, 256, 256, 0, 0, 256, 256);
+    const lv = lapVar(fx.getImageData(0, 0, 256, 256)), now = performance.now();
+    cam.lap.push([now, lv]); cam.lap = cam.lap.filter(e => now - e[0] < 5000);
+    const lmax = Math.max(...cam.lap.map(e => e[1]));
+    const focus = lv > 12 && lv >= 0.6 * lmax ? 'ok' : 'bad';
+    const steady = diff < 3.5 ? 'ok' : diff < 7 ? 'warn' : 'bad';
+    if (!say && focus !== 'ok') say = 'Hold still while the camera focuses';
+    if (!say && steady !== 'ok') say = 'Hold steady';
+    const lv2 = level.t && now - level.t < 1000 ? (Math.abs(level.beta) < 6 && Math.abs(level.gamma) < 6 ? 'ok' : 'warn') : null;
+    if (!say && lv2 === 'warn' && straight !== 'ok') say = 'Hold the phone flat and level over the card';
+    const good = found && light !== 'bad' && glare === 'ok' && framing === 'ok' && straight === 'ok' && focus === 'ok' && steady === 'ok';
+    cam.det = det.quad ? { quad: det.quad, good, full: det } : null;
+    const pill = (name, st) => `<span class="pill ${st === 'ok' ? 'ok' : st === 'warn' ? 'warn' : 'bad'}">${name}</span>`;
+    $('#checks').innerHTML = pill('Card found', found ? 'ok' : 'bad') + pill('Light', found ? light : 'warn') + pill('Glare', found ? glare : 'warn') + pill('Framing', framing === 'ok' ? 'ok' : 'bad') + pill('Straight', straight === 'ok' ? 'ok' : 'bad') + pill('Focus', focus) + pill('Steady', steady) + (lv2 ? pill('Phone level', lv2) : '');
+    $('#say').textContent = good ? ($('#auto').checked ? 'Hold it… capturing' : 'Looks good. Tap the shutter') : say;
+    if (good) { if (!cam.okSince) cam.okSince = now; if ($('#auto').checked && now - cam.okSince > 900) captureLive(); }
+    else cam.okSince = 0;
+  } finally { cam.busy = false; }
+}
+async function captureLive() {
+  const v = cam.video, c = cam.crop; if (!v || !c) return;
+  const det = cam.det; cam.okSince = 0;
+  const loaded = drawToImg(v, v.videoWidth, v.videoHeight, c);
+  stopCamera();
+  busy('Measuring…'); await nextFrame();
+  let rough = null;
+  if (det && det.quad) { const k = loaded.img.width / cam.AW; rough = det.quad.map(p => [p[0] * k, p[1] * k]); }
+  try { state.sides[state.step] = processSide(loaded, rough); } finally { busy(''); }
+  openReview();
+}
+async function onFile(file) {
+  if (!file) return;
+  busy('Measuring…'); await nextFrame();
+  try { const loaded = await fileToImg(file); state.sides[state.step] = processSide(loaded); }
+  catch (e) { busy(''); alertBox(e.message || 'That photo could not be opened.'); return; }
+  busy(''); openReview();
+}
+function alertBox(msg) { $('#nolive-msg').textContent = msg; }
+
+/* ---------- review ---------- */
+// Review view = straightened card plus PAD px of background, so the card's cut edge can be adjusted too.
+// Per side there are two lines: the card edge (outer, solid green) and the print border edge (inner, dashed blue).
+const PAD = 40;
+const rv = { drag: null, sel: null, outline: false, olQuad: null, olScale: 1 };
+const SIDE_NAME = { L: 'left', R: 'right', T: 'top', B: 'bottom' };
+function cur() { return state.sides[state.step]; }
+function canonToPhoto(s) { return CV.homography([[0, 0], [CV.W, 0], [CV.W, CV.H], [0, CV.H]], s.quad); }
+function ensureView(s) {
+  if (s.view) return;
+  const Hm = canonToPhoto(s), VW = CV.W + 2 * PAD, VH = CV.H + 2 * PAD;
+  const q = [[-PAD, -PAD], [CV.W + PAD, -PAD], [CV.W + PAD, CV.H + PAD], [-PAD, CV.H + PAD]].map(p => CV.applyH(Hm, p[0], p[1]));
+  s.view = CV.warp(s.img, q, VW, VH);
+  s.o = { L: 0, R: 0, T: 0, B: 0 };
+}
+// Border widths currently shown: inner line minus outer line.
+function widths(s) { const o = s.o || { L: 0, R: 0, T: 0, B: 0 }; return { L: s.b.L - o.L, R: s.b.R - o.R, T: s.b.T - o.T, B: s.b.B - o.B }; }
+// Line positions in view coords. id: 'oL' outer-left, 'iL' inner-left, etc.
+function linePos(s, id) {
+  const o = s.o, b = s.b, k = id[1], inner = id[0] === 'i', v = inner ? b[k] : o[k];
+  if (k === 'L') return PAD + v; if (k === 'R') return PAD + CV.W - v; if (k === 'T') return PAD + v; return PAD + CV.H - v;
+}
+function handlePos(s, id) {
+  const VW = CV.W + 2 * PAD, VH = CV.H + 2 * PAD, k = id[1], f = id[0] === 'o' ? 0.3 : 0.7, p = linePos(s, id);
+  return k === 'L' || k === 'R' ? [p, VH * f] : [VW * f, p];
+}
+const LINES = ['oL', 'iL', 'oR', 'iR', 'oT', 'iT', 'oB', 'iB'];
+function setLine(s, id, pos) {
+  const k = id[1], inner = id[0] === 'i';
+  let v = k === 'L' || k === 'T' ? pos - PAD : (k === 'R' ? PAD + CV.W - pos : PAD + CV.H - pos);
+  if (inner) v = Math.max(s.o[k] + 3, Math.min(s.o[k] + 180, v));
+  else v = Math.max(-PAD + 2, Math.min(s.b[k] - 3, v));
+  if (inner) s.b[k] = v; else s.o[k] = v;
+}
+// Commit a moved card edge: rebuild the outline from the outer lines and re-straighten, keeping the inner lines where they are.
+function applyOuter(s) {
+  const o = s.o; if (!o || (!o.L && !o.R && !o.T && !o.B)) return;
+  const Hm = canonToPhoto(s), x0 = o.L, y0 = o.T, x1 = CV.W - o.R, y1 = CV.H - o.B, sx = CV.W / (x1 - x0), sy = CV.H / (y1 - y0);
+  s.quad = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(p => CV.applyH(Hm, p[0], p[1]));
+  s.b = { L: (s.b.L - o.L) * sx, R: (s.b.R - o.R) * sx, T: (s.b.T - o.T) * sy, B: (s.b.B - o.B) * sy };
+  s.canon = CV.toCanonical(s.img, s.quad); s.view = null; ensureView(s); analyze(s);
+}
+function isAuto(s) {
+  const same = (a, b) => ['L', 'R', 'T', 'B'].every(k => Math.abs(a[k] - b[k]) < 0.01);
+  return s.auto && same(s.b, s.bAuto) && same(s.o || { L: 0, R: 0, T: 0, B: 0 }, { L: 0, R: 0, T: 0, B: 0 }) && s.quad.every((p, i) => Math.hypot(p[0] - s.quadAuto[i][0], p[1] - s.quadAuto[i][1]) < 0.01);
+}
+function openReview(stage) {
+  const s = cur();
+  show('review'); rv.sel = null;
+  rv.outline = stage ? stage === 'outline' : !state.editing && !state.demo;
+  rv.firstOutline = rv.outline; rv.olQuad = s.quad.map(p => p.slice());
+  setOutlineUi();
+  $('#rv-next').textContent = state.editing ? 'Update grades' : state.step === 'front' ? 'Next: photograph the back' : 'See grades';
+  drawReview();
+}
+function setOutlineUi() {
+  const name = state.step === 'front' ? 'front' : 'back';
+  $('#rv-title').textContent = rv.outline ? `Check the ${name} outline` : `Check the ${name} borders`;
+  $('#rv-stage').textContent = rv.outline ? 'Step 1 of 2 · card outline' : 'Step 2 of 2 · border lines';
+  $('#ol-retake').hidden = !rv.firstOutline || state.demo; $('#ol-cancel').hidden = rv.firstOutline;
+  $('#ol-bar').hidden = !rv.outline; $('#rv-next').hidden = rv.outline;
+  ['#rv-retake', '#rv-outline', '#rv-reset'].forEach(s => $(s).hidden = rv.outline || (s === '#rv-retake' && state.demo));
+  $('#rv-help').textContent = rv.outline ? 'Drag each corner so the green lines run exactly along the card\'s four straight edges. Corners are rounded, so the handle sits just outside the card where the edges would meet. The loupe shows the detail.' : 'Each side has two lines: green on the card\'s cut edge, blue dashed on the inner edge of the printed border. Drag a handle, or tap a line and nudge it.';
+  $('#readout').hidden = $('#ratios').hidden = $('#nudge').hidden = $('#line-legend').hidden = rv.outline;
+}
+function drawReview() {
+  const s = cur(), c = $('#rv'), x = c.getContext('2d');
+  const auto = isAuto(s);
+  $('#rv-auto').className = 'pill ' + (auto ? 'ok' : 'warn'); $('#rv-auto').textContent = auto ? 'Auto-detected' : 'Adjusted by you';
+  $('#rv-notes').innerHTML = s.warnings.map(([k, m]) => `<li class="${k}">${esc(m)}</li>`).join('');
+  if (rv.outline) {
+    const ph = s.photo, sc = Math.min(1, 1100 / Math.max(ph.width, ph.height)); rv.olScale = sc;
+    c.width = Math.round(ph.width * sc); c.height = Math.round(ph.height * sc);
+    x.drawImage(ph, 0, 0, c.width, c.height);
+    const q = rv.olQuad.map(p => [p[0] * sc, p[1] * sc]);
+    x.save(); x.fillStyle = 'rgba(10,12,16,.35)'; x.beginPath(); x.rect(0, 0, c.width, c.height); q.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill('evenodd'); x.restore();
+    for (let i = 0; i < 4; i++) {
+      const a = q[i], b = q[(i + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1];
+      x.strokeStyle = 'rgba(61,220,132,.55)'; x.lineWidth = 1.5; x.setLineDash([6, 5]); x.beginPath(); x.moveTo(a[0] - dx * 0.12, a[1] - dy * 0.12); x.lineTo(b[0] + dx * 0.12, b[1] + dy * 0.12); x.stroke();
+      x.setLineDash([]); x.strokeStyle = '#3DDC84'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
+    }
+    const hr = Math.max(12, c.width / 28);
+    q.forEach(p => { x.fillStyle = 'rgba(31,63,209,.35)'; x.strokeStyle = '#fff'; x.lineWidth = 2.5; x.beginPath(); x.arc(p[0], p[1], hr, 0, 7); x.fill(); x.stroke(); x.beginPath(); x.moveTo(p[0] - 5, p[1]); x.lineTo(p[0] + 5, p[1]); x.moveTo(p[0], p[1] - 5); x.lineTo(p[0], p[1] + 5); x.stroke(); });
+    return;
+  }
+  ensureView(s);
+  putImg(c, s.view);
+  const VW = c.width, VH = c.height;
+  for (const id of LINES) {
+    const p = linePos(s, id), inner = id[0] === 'i', vert = id[1] === 'L' || id[1] === 'R', sel = rv.sel === id;
+    const seg = () => { x.beginPath(); if (vert) { x.moveTo(p, 0); x.lineTo(p, VH); } else { x.moveTo(0, p); x.lineTo(VW, p); } };
+    x.save();
+    if (sel) { x.lineWidth = 9; x.strokeStyle = 'rgba(255,255,255,.85)'; x.setLineDash([]); seg(); x.stroke(); }
+    x.lineWidth = sel ? 4 : 3; x.strokeStyle = inner ? '#1F3FD1' : '#12A150'; x.setLineDash(inner ? [14, 8] : []); seg(); x.stroke();
+    const [hx, hy] = handlePos(s, id);
+    x.setLineDash([]); x.fillStyle = inner ? '#1F3FD1' : '#12A150'; x.strokeStyle = '#fff'; x.lineWidth = 3;
+    x.beginPath(); if (inner) x.arc(hx, hy, 18, 0, 7); else x.rect(hx - 15, hy - 15, 30, 30); x.fill(); x.stroke();
+    x.restore();
+  }
+  renderReadout(s);
+  const n = $('#nudge-name');
+  n.textContent = rv.sel ? `${rv.sel[0] === 'o' ? 'Card edge' : 'Border edge'} · ${SIDE_NAME[rv.sel[1]]}` : 'Tap a line to fine-tune it';
+  $('#nudge-minus').disabled = $('#nudge-plus').disabled = !rv.sel;
+  const vert = rv.sel && (rv.sel[1] === 'L' || rv.sel[1] === 'R');
+  $('#nudge-minus').textContent = vert ? '◀ 0.05 mm' : '▲ 0.05 mm'; $('#nudge-plus').textContent = vert ? '0.05 mm ▶' : '0.05 mm ▼';
+}
+// Which way is it off? Name the wider border and where the artwork sits.
+function direction(a, b, wideA, wideB, artA, artB) {
+  const d = Math.abs(a - b) / (a + b) * 100;
+  if (d < 1) return 'even';
+  return a > b ? `wider ${wideA}, art sits ${artA}` : `wider ${wideB}, art sits ${artB}`;
+}
+function centerText(s) {
+  const w = widths(s), c = CV.centering(w);
+  return { c, w, lrDir: direction(w.L, w.R, 'left', 'right', 'right', 'left'), tbDir: direction(w.T, w.B, 'top', 'bottom', 'low', 'high') };
+}
+function renderReadout(s) {
+  const { c, w, lrDir, tbDir } = centerText(s), mm = v => (v / CV.MM).toFixed(2);
+  $('#readout').innerHTML = [['Left', w.L], ['Right', w.R], ['Top', w.T], ['Bottom', w.B]].map(([n, v]) => `<div><small>${n}</small><b>${mm(v)}</b><small>mm</small></div>`).join('');
+  const isBack = state.step === 'back';
+  const ticks = isBack ? [[75, 'PSA 10'], [90, '9']] : [[55, 'PSA 10'], [60, '9'], [65, '8'], [70, '7']];
+  const lo = 50, hi = isBack ? 95 : 75, pos = v => ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo) * 100).toFixed(1);
+  const bar = v => `<div class="scale" style="background:linear-gradient(90deg,#DDF0E4 0 ${pos(ticks[0][0])}%,#F4ECD7 ${pos(ticks[0][0])}% ${pos(ticks[ticks.length - 1][0])}%,#F6DEDB ${pos(ticks[ticks.length - 1][0])}% 100%)">${ticks.map(([t, l]) => `<i style="left:${pos(t)}%"><span>${l}</span></i>`).join('')}<em style="left:${pos(v)}%"></em></div>`;
+  const worse = c.lrWorst >= c.tbWorst ? 'left/right' : 'top/bottom';
+  $('#ratios').innerHTML = `<div class="ratio"><span class="lbl">Left / right</span><span class="val">${c.lr[0].toFixed(1)}/${c.lr[1].toFixed(1)}</span><span class="dir">${lrDir}</span>${bar(c.lrWorst)}</div><div class="ratio"><span class="lbl">Top / bottom</span><span class="val">${c.tb[0].toFixed(1)}/${c.tb[1].toFixed(1)}</span><span class="dir">${tbDir}</span>${bar(c.tbWorst)}</div><p class="small muted" style="grid-column:1/-1">The ${worse} split is the worse one, so it sets the centering grade.</p>`;
+}
+function evPos(e) { const c = $('#rv'), r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height, c.width / r.width]; }
+function drawLoupe(px, py, clientX) {
+  const s = cur(), L = $('#loupe'), lx = L.getContext('2d'), wrap = $('#rvwrap').getBoundingClientRect();
+  L.style.display = 'block'; L.style.left = (clientX - wrap.left < wrap.width / 2 ? wrap.width - 136 : 8) + 'px';
+  lx.imageSmoothingEnabled = false; lx.fillStyle = '#111'; lx.fillRect(0, 0, 256, 256);
+  if (rv.outline) {
+    const cx = px / rv.olScale, cy = py / rv.olScale, r = Math.max(18, Math.max(s.photo.width, s.photo.height) * 0.018), z = 256 / (2 * r);
+    lx.imageSmoothingEnabled = true; lx.drawImage(s.photo, cx - r, cy - r, 2 * r, 2 * r, 0, 0, 256, 256);
+    const q = rv.olQuad.map(p => [(p[0] - cx + r) * z, (p[1] - cy + r) * z]);
+    lx.strokeStyle = '#3DDC84'; lx.lineWidth = 2; lx.beginPath();
+    for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1]; lx.moveTo(a[0] - dx * 0.2, a[1] - dy * 0.2); lx.lineTo(b[0] + dx * 0.2, b[1] + dy * 0.2); }
+    lx.stroke(); return;
+  }
+  else { const r = 32; lx.drawImage($('#rv'), px - r, py - r, 2 * r, 2 * r, 0, 0, 256, 256); }
+  lx.strokeStyle = '#fff'; lx.lineWidth = 1; lx.beginPath(); lx.moveTo(128, 100); lx.lineTo(128, 156); lx.moveTo(100, 128); lx.lineTo(156, 128); lx.stroke();
+}
+function pickLine(s, px, py, k) {
+  // Handles first (they are staggered so the two lines on a side never share a grab point), then the nearest line.
+  let best = null, bd = 1e9;
+  for (const id of LINES) { const [hx, hy] = handlePos(s, id), d = Math.hypot(hx - px, hy - py); if (d < bd) { bd = d; best = id; } }
+  if (bd < 28 * k) return best;
+  best = null; bd = 1e9;
+  for (const id of LINES) { const p = linePos(s, id), d = Math.abs((id[1] === 'L' || id[1] === 'R' ? px : py) - p); if (d < bd) { bd = d; best = id; } }
+  return bd < 14 * k ? best : null;
+}
+function nudge(dir) {
+  const s = cur(), id = rv.sel; if (!id) return;
+  setLine(s, id, linePos(s, id) + dir * 0.5);
+  if (id[0] === 'o') applyOuter(s); else analyze(s);
+  drawReview();
+}
+function bindReview() {
+  const c = $('#rv');
+  c.addEventListener('pointerdown', e => {
+    const [px, py, k] = evPos(e), s = cur(); if (!s) return;
+    if (rv.outline) {
+      const sc = rv.olScale; let best = -1, bd = 1e9;
+      rv.olQuad.forEach((p, i) => { const d = Math.hypot(p[0] * sc - px, p[1] * sc - py); if (d < bd) { bd = d; best = i; } });
+      if (bd < 60 * k) { const cp = rv.olQuad[best]; rv.drag = { corner: best, ox: px - cp[0] * sc, oy: py - cp[1] * sc }; c.setPointerCapture(e.pointerId); drawLoupe(cp[0] * sc, cp[1] * sc, e.clientX); }
+      return;
+    }
+    const id = pickLine(s, px, py, k);
+    rv.sel = id; drawReview();
+    if (id) {
+      const p = linePos(s, id), vert = id[1] === 'L' || id[1] === 'R';
+      rv.drag = { line: id, off: (vert ? px : py) - p, moved: false };
+      c.setPointerCapture(e.pointerId); drawLoupe(vert ? p : px, vert ? py : p, e.clientX);
+    }
+  });
+  c.addEventListener('pointermove', e => {
+    if (!rv.drag) return; const [px, py] = evPos(e), s = cur();
+    if (rv.drag.corner != null) { const nx = px - rv.drag.ox, ny = py - rv.drag.oy; rv.olQuad[rv.drag.corner] = [nx / rv.olScale, ny / rv.olScale]; rv.olMoved = true; drawReview(); drawLoupe(nx, ny, e.clientX); return; }
+    const id = rv.drag.line, vert = id[1] === 'L' || id[1] === 'R';
+    setLine(s, id, (vert ? px : py) - rv.drag.off); rv.drag.moved = true;
+    drawReview(); const p = linePos(s, id); drawLoupe(vert ? p : px, vert ? py : p, e.clientX);
+  });
+  const end = () => {
+    if (!rv.drag) return; const d = rv.drag; rv.drag = null; $('#loupe').style.display = 'none';
+    if (d.line && d.moved) { const s = cur(); if (d.line[0] === 'o') applyOuter(s); else analyze(s); drawReview(); }
+  };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  $('#nudge-minus').onclick = () => nudge(-1);
+  $('#nudge-plus').onclick = () => nudge(1);
+  $('#rv-reset').onclick = () => {
+    const s = cur(); s.quad = s.quadAuto.map(p => p.slice()); s.b = Object.assign({}, s.bAuto);
+    s.canon = CV.toCanonical(s.img, s.quad); s.view = null; analyze(s); rv.sel = null; drawReview();
+  };
+  $('#rv-outline').onclick = () => { rv.outline = true; rv.firstOutline = false; rv.olQuad = cur().quad.map(p => p.slice()); setOutlineUi(); drawReview(); };
+  $('#ol-cancel').onclick = () => { rv.outline = false; setOutlineUi(); drawReview(); };
+  $('#ol-retake').onclick = () => openCapture(state.step);
+  $('#ol-apply').onclick = async () => {
+    const s = cur(), nq = CV.orderPortrait(rv.olQuad.map(p => p.slice()));
+    const changed = nq.some((p, i) => Math.hypot(p[0] - s.quad[i][0], p[1] - s.quad[i][1]) > 0.5);
+    if (changed) {
+      busy('Re-measuring…'); await nextFrame();
+      // Snap the hand-placed outline onto the nearest real edges, then measure from it.
+      const snap = CV.detectCard(s.img, { rough: nq, band: Math.max(6, Math.max(s.img.width, s.img.height) * 0.006), near: true });
+      const ok = snap.quad && snap.quad.every((p, i) => Math.hypot(p[0] - nq[i][0], p[1] - nq[i][1]) < Math.max(8, s.stats.pxPerMm * 0.8));
+      s.quad = ok ? snap.quad : nq; s.auto = true;
+      s.det = Object.assign({}, s.det, { ok: true, conf: 1, quad: s.quad, edgeWidthMm: ok ? snap.edgeWidthMm : s.det.edgeWidthMm });
+      measure(s, true); busy('');
+    }
+    rv.outline = false; rv.firstOutline = false; setOutlineUi(); drawReview();
+  };
+  $('#rv-retake').onclick = () => openCapture(state.step);
+  $('#rv-next').onclick = () => {
+    if (state.editing || state.step === 'back') { state.editing = false; openResults(); }
+    else openCapture('back');
+  };
+}
+
+/* ---------- results ---------- */
+function measurementsOf(s) { return { cent: { worst: s.cent.worst }, cornerFr: s.cond.corners.map(c => c.frac), edgeFr: s.cond.edges.map(e => e.frac), surfFr: s.cond.surface.frac }; }
+function compute() {
+  const F = state.sides.front, B = state.sides.back;
+  return GRADE.estimate({ front: measurementsOf(F), back: B ? measurementsOf(B) : null, flags: state.flags, ai: state.aiPoints, useAi: state.useAi });
+}
+function callText(est) {
+  const r = Object.fromEntries(est.results.map(x => [x.co, x])), psa = r.PSA, bgs = r.BGS, fmt = GRADE.fmt;
+  const lim = (psa.limit || '').toLowerCase();
+  if (psa.grade === 10) return [`Submit it. This card measures like a PSA 10.`, `Centering and every condition check clear PSA's Gem Mint bar${psa.note ? ', but ' + psa.note.toLowerCase() : ''}. Check the surface in hand before you pay for grading.`];
+  if (bgs.grade >= 9.5 && psa.grade === 9) return [`BGS is the better bet: ${bgs.label} vs PSA ${psa.grade}.`, `PSA would likely stop at 9 because of ${lim}. Beckett's subgrades let a strong card carry one weaker area.`];
+  if (psa.grade === 9) return [`PSA 9 territory, held back by ${lim}.`, `Grade it only if the price gap between raw and a PSA 9 covers the fee. A 10 is unlikely with this ${lim}.`];
+  if (psa.grade >= 7) return [`Keep it raw unless it's a valuable card.`, `Expect around PSA ${psa.grade} (${psa.label}). ${psa.limit} is what pulls it down.`];
+  return [`Not worth grading for value.`, `Expect PSA ${psa.grade} or lower. ${psa.limit} is the main problem.`];
+}
+function openResults() {
+  state.step = 'results'; show('results');
+  $('#res-ex').hidden = !state.demo;
+  $('#cardname').value = state.name || '';
+  $('#edit-back').hidden = !state.sides.back;
+  $('#save').textContent = state.demo ? 'Example only' : state.savedId ? 'Update saved card' : 'Save to my cards';
+  $('#save').disabled = state.demo;
+  renderFlags(); renderResults(); renderZooms(); renderAiPanel();
+}
+function renderResults() {
+  const est = compute(); state.est = est;
+  const [big, why] = callText(est); $('#call').textContent = big; $('#call-why').textContent = why;
+  $('#verdict').innerHTML = `<thead><tr><th>Company</th><th>Estimate</th><th>Held back by</th></tr></thead><tbody>` + est.results.map(r => `<tr class="${r === est.best ? 'best' : ''}"><td class="co">${r.co}</td><td><span class="grade">${esc(r.label)}</span>${r.note ? `<div class="small muted">${esc(r.note)}</div>` : ''}</td><td>${esc(r.limit)}</td></tr>`).join('') + `</tbody>`;
+  const B = state.sides.back;
+  $('#verdict-note').textContent = (B ? '' : 'Back not photographed, so grades assume a clean, centred back. ') + `Highlighted row: the slab most likely to read best. Standards checked ${GRADE.STANDARDS.checked}.`;
+  const F = state.sides.front, P = est.points, fmt = GRADE.fmt, sub = GRADE.sub;
+  const cent = s => s ? `<span class="mono">${s.cent.lr[0].toFixed(1)}/${s.cent.lr[1].toFixed(1)}</span> <span class="small muted">L/R</span><div class="small muted">${esc(s.dirs.lr)}</div><span class="mono">${s.cent.tb[0].toFixed(1)}/${s.cent.tb[1].toFixed(1)}</span> <span class="small muted">T/B</span><div class="small muted">${esc(s.dirs.tb)}</div>` : '<span class="muted">—</span>';
+  const corners = side => side ? side.corners.map(v => fmt(sub(v))).join(' · ') : '—';
+  const edges = side => side ? side.edges.map(v => fmt(sub(v))).join(' · ') : '—';
+  const PF = P.perSide.F, PB = P.perSide.B;
+  $('#factors').innerHTML = `<thead><tr><th>Factor</th><th>Front</th><th>Back</th><th>Sub</th></tr></thead><tbody>
+    <tr><td>Centering</td><td>${cent(F)}</td><td>${cent(B)}</td><td class="grade">${fmt(est.results[1].subs[0])}</td></tr>
+    <tr><td>Corners<div class="small muted">TL · TR · BR · BL</div></td><td class="mono small">${corners(PF)}</td><td class="mono small">${corners(PB)}</td><td class="grade">${fmt(est.subs.corners)}</td></tr>
+    <tr><td>Edges<div class="small muted">T · R · B · L</div></td><td class="mono small">${edges(PF)}</td><td class="mono small">${edges(PB)}</td><td class="grade">${fmt(est.subs.edges)}</td></tr>
+    <tr><td>Surface</td><td class="mono small">${fmt(sub(PF.surface))}</td><td class="mono small">${PB ? fmt(sub(PB.surface)) : '—'}</td><td class="grade">${fmt(est.subs.surface)}</td></tr>
+  </tbody>`;
+}
+function maskedCanvas(s, x0, y0, w, h, outW) {
+  const c = canvasOf(outW, Math.round(outW * h / w)), x = c.getContext('2d'), src = canvasOf(CV.W, CV.H);
+  putImg(src, s.canon);
+  x.imageSmoothingEnabled = outW < w; x.drawImage(src, x0, y0, w, h, 0, 0, c.width, c.height);
+  if ($('#show-mask').checked) {
+    const m = s.cond.mask, ov = canvasOf(w, h), ox = ov.getContext('2d'), id = ox.createImageData(w, h);
+    const cols = { 1: [224, 36, 154], 2: [16, 181, 214], 3: [242, 169, 0] };
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const v = m[(y0 + yy) * CV.W + x0 + xx]; if (v) { const p = (yy * w + xx) * 4, cc = cols[v]; id.data[p] = cc[0]; id.data[p + 1] = cc[1]; id.data[p + 2] = cc[2]; id.data[p + 3] = 230; } }
+    ox.putImageData(id, 0, 0); x.drawImage(ov, 0, 0, c.width, c.height);
+  }
+  return c;
+}
+function renderZooms() {
+  const cards = $('#cards'), zooms = $('#zooms'); cards.innerHTML = ''; zooms.innerHTML = '';
+  for (const k of ['front', 'back']) {
+    const s = state.sides[k]; if (!s) continue;
+    const fig = document.createElement('figure'), cv = maskedCanvas(s, 0, 0, CV.W, CV.H, 420);
+    const cap = document.createElement('figcaption'); cap.innerHTML = `<span>${k === 'front' ? 'Front' : 'Back'}</span><span class="mono">${s.cent.lr[0].toFixed(0)}/${s.cent.lr[1].toFixed(0)} · ${s.cent.tb[0].toFixed(0)}/${s.cent.tb[1].toFixed(0)}</span>`;
+    fig.append(cv, cap); cards.append(fig);
+    const z = 70, grid = document.createElement('div'); grid.className = 'zooms'; grid.style.marginTop = '8px';
+    const names = ['TL', 'TR', 'BR', 'BL'], pos = [[0, 0], [CV.W - z, 0], [CV.W - z, CV.H - z], [0, CV.H - z]];
+    names.forEach((n, i) => { const f = document.createElement('figure'), c = maskedCanvas(s, pos[i][0], pos[i][1], z, z, 210), cp = document.createElement('figcaption'); cp.textContent = `${k === 'front' ? 'F' : 'B'} ${n} · ${(s.cond.corners[i].frac * 100).toFixed(1)}%`; f.append(c, cp); grid.append(f); });
+    zooms.append(grid);
+  }
+}
+const FLAGS = [['crease', 'Crease or bend'], ['dent', 'Dent or indent'], ['scratch', 'Scratches on holo'], ['printline', 'Print lines'], ['stain', 'Stain or mark']];
+function renderFlags() {
+  $('#flags').innerHTML = FLAGS.map(([k, l]) => `<label><input type="checkbox" id="fl-${k}" ${state.flags[k] ? 'checked' : ''}> ${l}</label>`).join('');
+  FLAGS.forEach(([k]) => $('#fl-' + k).onchange = e => { state.flags[k] = e.target.checked; renderResults(); });
+}
+
+/* ---------- Claude second opinion ---------- */
+function renderAiPanel() {
+  $('#ai-panel').hidden = !sampleApi;
+  const out = $('#ai-out');
+  if (!state.ai) { out.innerHTML = ''; $('#ai-go').disabled = false; $('#ai-go').textContent = 'Ask Claude to inspect'; return; }
+  const a = state.ai, list = arr => (arr || []).map(i => `<li>${esc(i)}</li>`).join('');
+  out.innerHTML = `<div class="notes" style="margin-top:4px"><li class="${a.confidence === 'low' ? 'warn' : 'ok'}">${esc(a.summary || '')}</li></div>
+    <ul class="small" style="margin:8px 0 0;padding-left:18px">${list((a.front && a.front.issues) || [])}${list((a.back && a.back.issues) || [])}</ul>
+    <label class="switch" style="margin-top:10px"><input type="checkbox" id="use-ai" ${state.useAi ? 'checked' : ''}> Use Claude's findings in the grades</label>`;
+  $('#use-ai').onchange = e => { state.useAi = e.target.checked; renderResults(); };
+}
+function toBlob(canvas, q) { return new Promise(r => canvas.toBlob(r, 'image/jpeg', q || 0.88)); }
+async function runAi() {
+  const btn = $('#ai-go'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Inspecting…';
+  try {
+    const imgs = [], labels = [];
+    for (const k of ['front', 'back']) { const s = state.sides[k]; if (!s) continue; const c = canvasOf(CV.W, CV.H); putImg(c, s.canon); imgs.push(await toBlob(c)); labels.push(`${k} (straightened, 10 px/mm)`); }
+    // corner mosaic: 8 corners at 3x
+    const z = 70, m = canvasOf(4 * z * 3, 2 * z * 3), mx = m.getContext('2d'); mx.imageSmoothingEnabled = false;
+    ['front', 'back'].forEach((k, row) => { const s = state.sides[k]; if (!s) return; const src = canvasOf(CV.W, CV.H); putImg(src, s.canon); [[0, 0], [CV.W - z, 0], [CV.W - z, CV.H - z], [0, CV.H - z]].forEach((p, i) => mx.drawImage(src, p[0], p[1], z, z, i * z * 3, row * z * 3, z * 3, z * 3)); });
+    imgs.push(await toBlob(m, 0.92)); labels.push('corner close-ups: row 1 front TL TR BR BL, row 2 back TL TR BR BL');
+    let lim = null; try { lim = await sampleApi.limits(); } catch (e) {}
+    const maxImgs = lim && typeof lim.images === 'number' ? lim.images : imgs.length;
+    if (lim && lim.images === false) throw { code: 'no_images' };
+    const send = imgs.slice(0, Math.max(1, maxImgs)), sentLabels = labels.slice(0, send.length);
+    const prompt = `You are a strict trading card pre-grader. You get photos of one Pokémon card: ${sentLabels.map((l, i) => `image ${i + 1} = ${l}`).join('; ')}.
+Look for: corner whitening or rounding, edge whitening or chipping, scratches, scuffs, print lines, dents, creases, stains, loss of gloss. Ignore centering. Ignore glare reflections, but say if glare hides an area. Judge only what is visible; say so if the photo is too soft.
+Reply with JSON only, no prose: {"front":{"corners":[TL,TR,BR,BL],"edges":n,"surface":n,"issues":["short sentence", ...]},"back":{same or null},"confidence":"low"|"medium"|"high","summary":"one or two sentences"}. Scores use the 1-10 half-point scale where 10 is flawless under magnification.`;
+    let res;
+    if (typeof sampleApi.json === 'function') res = await sampleApi.json(prompt, { images: send, modelTier: 'default' });
+    else { const t = await sampleApi(prompt, { images: send, modelTier: 'default' }); res = JSON.parse((t.text || '').replace(/^[^{]*/, '').replace(/[^}]*$/, '')); }
+    if (res && res.value && !res.front) res = res.value;
+    state.ai = res;
+    const sides = [res.front, res.back].filter(Boolean), num = v => Math.max(1, Math.min(10, Number(v) || 10));
+    const comb = arr => arr.length > 1 ? 0.7 * Math.min(...arr) + 0.3 * Math.max(...arr) : arr[0];
+    state.aiPoints = {
+      corners: comb(sides.map(s => { const c = (s.corners || [10]).map(num); return 0.7 * Math.min(...c) + 0.3 * c.reduce((a, b) => a + b, 0) / c.length; })) * 100,
+      edges: comb(sides.map(s => num(s.edges))) * 100,
+      surface: comb(sides.map(s => num(s.surface))) * 100
+    };
+    state.useAi = true; renderAiPanel(); renderResults();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Ask Claude to inspect';
+    const msg = e && e.code === 'rate_limited' ? 'Claude is busy right now. Try again in a minute.' : e && e.code === 'not_granted' ? 'Claude inspection was not allowed for this page.' : e && e.code === 'no_images' ? 'Image inspection is not available here.' : 'Claude could not inspect the card this time. Try again.';
+    $('#ai-out').innerHTML = `<div class="notes"><li class="warn">${esc(msg)}</li></div>`;
+    if (e && e.code === 'not_granted') $('#ai-panel').hidden = true;
+  }
+}
+
+/* ---------- history ---------- */
+const HKEY = 'pregrade.history.v1';
+function loadHist() { try { return JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch (e) { return []; } }
+function saveHist(list) { try { localStorage.setItem(HKEY, JSON.stringify(list.slice(0, 15))); return true; } catch (e) { return false; } }
+function thumb(s) { const c = canvasOf(CV.W, CV.H); putImg(c, s.canon); const t = canvasOf(90, 126); t.getContext('2d').drawImage(c, 0, 0, 90, 126); return t.toDataURL('image/jpeg', 0.7); }
+function saveCurrent() {
+  const list = loadHist(), est = state.est || compute();
+  const entry = { id: state.savedId || Date.now(), date: new Date().toISOString(), name: $('#cardname').value.trim(), thumb: thumb(state.sides.front),
+    grades: est.results.map(r => [r.co, r.co === 'TAG' ? `${GRADE.fmt(r.grade)} · ${r.score}` : r.label]), cent: [state.sides.front.cent.worst, state.sides.back ? state.sides.back.cent.worst : null] };
+  const i = list.findIndex(e => e.id === entry.id); if (i >= 0) list[i] = entry; else list.unshift(entry);
+  const ok = saveHist(list); state.savedId = entry.id; state.name = entry.name;
+  $('#save').textContent = ok ? 'Saved' : 'Could not save on this device';
+}
+function renderHome() {
+  const list = loadHist(), h = $('#hist');
+  $('#hist-count').textContent = list.length ? `${list.length} saved on this device` : '';
+  const items = list.map(e => `<div class="hitem"><img alt="" src="${esc(e.thumb)}"><div><b>${esc(e.name || 'Unnamed card')}</b><div class="small muted">${new Date(e.date).toLocaleDateString()} · front ${e.cent[0] ? Math.round(e.cent[0]) + '/' + Math.round(100 - e.cent[0]) : ''}</div><div class="chips">${e.grades.map(g => `<span class="chip">${esc(g[0])} ${esc(String(g[1]).replace(/^[A-Za-z\-\/+ ]+(?=\d)/, ''))}</span>`).join('')}</div></div><button class="btn ghost small" data-del="${e.id}" type="button" aria-label="Delete">Delete</button></div>`);
+  const demo = `<button class="hitem" id="open-demo" type="button"><canvas id="demo-thumb" width="90" height="126"></canvas><div><span class="tag-ex">Example</span><b style="display:block">Synthetic demo card</b><div class="chips" id="demo-chips"><span class="small muted">Preparing…</span></div></div><span class="muted">›</span></button>`;
+  h.innerHTML = items.join('') + demo;
+  h.querySelectorAll('[data-del]').forEach(b => b.onclick = ev => { ev.stopPropagation(); saveHist(loadHist().filter(e => String(e.id) !== b.dataset.del)); renderHome(); });
+  $('#open-demo').onclick = openDemo;
+  if (demoCache) paintDemoEntry();
+}
+
+/* ---------- demo ---------- */
+let demoCache = null;
+function buildDemo() {
+  if (demoCache) return demoCache;
+  const mk = (side, spec, quad) => {
+    const cc = DEMO.makeCardCanvas(canvasOf, side, spec), cd = cc.getContext('2d').getImageData(0, 0, cc.width, cc.height);
+    const ph = DEMO.composePhoto(cd, quad, DEMO.DEMO.pw, DEMO.DEMO.ph, side === 'front' ? 11 : 23, CV);
+    const pc = canvasOf(ph.width, ph.height); putImg(pc, ph);
+    const id = pc.getContext('2d').getImageData(0, 0, pc.width, pc.height);
+    return processSide({ img: id, canvas: pc, scale: 1 });
+  };
+  demoCache = { front: mk('front', DEMO.DEMO.front, DEMO.DEMO.frontQuad), back: mk('back', DEMO.DEMO.back, DEMO.DEMO.backQuad) };
+  return demoCache;
+}
+function paintDemoEntry() {
+  const d = demoCache, t = $('#demo-thumb'); if (!t) return;
+  const c = canvasOf(CV.W, CV.H); putImg(c, d.front.canon); t.getContext('2d').drawImage(c, 0, 0, 90, 126);
+  const est = GRADE.estimate({ front: measurementsOf(d.front), back: measurementsOf(d.back), flags: {} });
+  $('#demo-chips').innerHTML = est.results.map(r => `<span class="chip">${r.co} ${r.co === 'TAG' ? r.score : GRADE.fmt(r.grade)}</span>`).join('');
+}
+async function openDemo() {
+  busy('Building the example…'); await nextFrame();
+  const d = buildDemo(); busy('');
+  Object.assign(state, { sides: { front: d.front, back: d.back }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: true, editing: false, savedId: null, name: '' });
+  openResults();
+}
+
+/* ---------- sources ---------- */
+function renderSources() {
+  const items = [
+    `<b>PSA</b>: Gem Mint 10 needs about 55/45 front and 75/25 back; older PSA wording said 55/45 to 60/40, so the app flags 55–60 as a coin flip. 9 is 60/40 front, 90/10 back; lower grades loosen from there (psacard.com and collector guides, checked ${GRADE.STANDARDS.checked}).`,
+    `<b>CGC</b>: Pristine 10 is 50/50; Gem Mint 10 about 55/45 front, 75/25 back; Mint 9 is 60/40 and 90/10 (cgccards.com grading scale, checked ${GRADE.STANDARDS.checked}). 9.5 and 8.5 centering limits aren't published; the app interpolates them.`,
+    `<b>BGS</b>: centering subgrade 10 needs near 50/50 front and 55/45 back, 9.5 is 55/45 and 60/40, 9 is 60/40 and 65/35 (collector guides; Beckett's own page wasn't reachable). The overall grade is estimated from the four subgrades, capped at one point above the lowest.`,
+    `<b>SGC</b>: 10 needs about 55/45 front; Pristine needs near 50/50. Figures come from collector guides and vary between them, so treat SGC as the roughest estimate.`,
+    `<b>TAG</b>: 1000-point score; 990+ is Pristine, 950–989 Gem Mint 10, 900–949 a 9, then 50 points per half grade. Gem Mint centering is about 55/45 front and 65/35 back for TCG cards (taggrading.com, checked ${GRADE.STANDARDS.checked}). How TAG weights each factor isn't published; the app's weighting is its own.`,
+    `<b>Corners, edges and surface</b> are scored from whitening and spots found in the photo. The thresholds are the app's own heuristics, tuned on synthetic test cards, not on graded slabs. Treat them as a screen, not a verdict.`
+  ];
+  $('#sources').innerHTML = items.map(i => `<li>${i}</li>`).join('');
+}
+
+/* ---------- wiring ---------- */
+function startFlow() { startOrientation(); Object.assign(state, { sides: { front: null, back: null }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: false, editing: false, savedId: null, name: '' }); openCapture('front'); }
+$('#go-home').onclick = () => { show('home'); renderHome(); };
+$('#start').onclick = startFlow;
+$('#again').onclick = startFlow;
+$('#take').onclick = () => $('#f-cam').click();
+$('#pick').onclick = () => $('#f-pick').click();
+$('#use-file').onclick = () => $('#f-pick').click();
+$('#f-cam').onchange = e => { const f = e.target.files[0]; e.target.value = ''; onFile(f); };
+$('#f-pick').onchange = e => { const f = e.target.files[0]; e.target.value = ''; onFile(f); };
+$('#shoot').onclick = () => captureLive();
+$('#skip-back').onclick = () => { state.sides.back = null; openResults(); };
+$('#show-mask').onchange = renderZooms;
+$('#save').onclick = saveCurrent;
+$('#edit-front').onclick = () => { state.editing = true; state.step = 'front'; openReview(); };
+$('#edit-back').onclick = () => { state.editing = true; state.step = 'back'; openReview(); };
+$('#ai-go').onclick = runAi;
+bindReview(); renderSources(); renderHome(); show('home');
+setTimeout(() => { try { buildDemo(); paintDemoEntry(); } catch (e) { console.error(e); } }, 60);
+(function hookClaude(tries) {
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('sample').then(s => { sampleApi = s || null; if (!$('#results').hidden) renderAiPanel(); }).catch(() => {});
+  } else if (tries < 6) setTimeout(() => hookClaude(tries + 1), 500 * (tries + 1));
+})(0);
+</script>
+</body>
+</html>
