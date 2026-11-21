@@ -223,7 +223,7 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
         <div class="stage"><canvas id="live-cv"></canvas><div class="say" id="say">Starting camera…</div></div>
         <div class="checks" id="checks"></div>
         <div class="row" style="justify-content:space-between">
-          <label class="switch"><input type="checkbox" id="auto" checked> Auto-capture</label>
+          <div class="row" style="gap:10px"><label class="switch"><input type="checkbox" id="auto" checked> Auto</label><div class="seg small" id="zoom-seg"><button type="button" data-z="1" class="on">1×</button><button type="button" data-z="2">2×</button></div></div>
           <button class="shutter" id="shoot" type="button" aria-label="Take photo"></button>
           <button class="btn" id="use-file" type="button">Use a photo</button>
         </div>
@@ -302,6 +302,7 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     </div>
     <div class="row" id="ol-bar" hidden>
       <button class="btn primary" id="ol-apply" type="button">Outline is on the card edge</button>
+      <button class="btn" id="ol-outer" type="button">Outline on the inner frame? Snap outward</button>
       <button class="btn" id="ol-retake" type="button">Retake</button>
       <button class="btn" id="ol-cancel" type="button">Cancel</button>
     </div>
@@ -711,41 +712,54 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     }
     return n ? hit / n : 0;
   }
-  // If the quad found is the card's print frame, an even band of border colour surrounds it, ending at the cut edge.
-  function expandToCard(S, q) {
-    const st = quadStats(q), minSide = Math.min(st.left, st.right, st.top, st.bot), maxS = Math.max(6, Math.round(minSide * 0.11));
+  // If the quad found is the card's print frame, the card's cut edge runs parallel just outside it on every side.
+  // Average the outward edge strength along each whole side: a real edge gives one clear peak; background texture averages out.
+  // A shadow only shows on one or two sides, so at least three sides must agree.
+  function expandToCard(S, q, G) {
+    const st = quadStats(q), minSide = Math.min(st.left, st.right, st.top, st.bot);
+    const lo = Math.max(2, minSide * 0.02), hi = Math.max(lo + 3, minSide * 0.11), steps = Math.ceil(hi + 4);
     const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
-    const sides = [], t = [0, 0, 0];
+    const res = [];
     for (let i = 0; i < 4; i++) {
       const p0 = q[i], p1 = q[(i + 1) % 4], dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy); let nx = -dy / L, ny = dx / L;
-      const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2; if ((cx - mx) * nx + (cy - my) * ny > 0) { nx = -nx; ny = -ny; } // outward
-      const ws = [], cols = [], ins = [];
-      for (let k = 0; k < 20; k++) {
-        const tt = 0.15 + 0.7 * k / 19, bx = p0[0] + dx * tt, by = p0[1] + dy * tt;
-        const c2 = sample(S, bx + nx * 2, by + ny * 2, [0, 0, 0]).slice(); cols.push(c2);
-        ins.push(sample(S, bx - nx * 2, by - ny * 2, [0, 0, 0]).slice());
-        let w = -1;
-        for (let s2 = 3; s2 <= maxS; s2++) {
-          const a = sample(S, bx + nx * s2, by + ny * s2, t).slice(), b = sample(S, bx + nx * (s2 + 1), by + ny * (s2 + 1), [0, 0, 0]);
-          if (cdist(a, c2) > 40 && cdist(b, c2) > 40) { w = s2 - 0.5; break; }
+      const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2; if ((cx - mx) * nx + (cy - my) * ny > 0) { nx = -nx; ny = -ny; }
+      const prof = new Float32Array(steps + 1), N = 40;
+      for (let k = 0; k < N; k++) {
+        const tt = 0.18 + 0.64 * k / (N - 1), bx = p0[0] + dx * tt, by = p0[1] + dy * tt;
+        for (let s2 = 0; s2 <= steps; s2++) {
+          const x = Math.round(bx + nx * s2), y = Math.round(by + ny * s2); if (x < 1 || y < 1 || x >= G.w - 1 || y >= G.h - 1) continue;
+          const j = y * G.w + x; prof[s2] += Math.abs(G.gx[j] * nx + G.gy[j] * ny) / N;
         }
-        if (w > 0) ws.push(w);
       }
-      if (ws.length < 10) return null;
-      const m = median(ws), cons = ws.filter(v => Math.abs(v - m) <= 1.5).length / 20;
-      const bc = [0, 1, 2].map(c => median(cols.map(v => v[c]))), ic = [0, 1, 2].map(c => median(ins.map(v => v[c])));
-      sides.push({ w: m, cons, bc, ic, nx, ny });
+      const sm = Array.from(prof, (v, j) => (prof[Math.max(0, j - 1)] + 2 * v + prof[Math.min(steps, j + 1)]) / 4);
+      const base = median(sm.slice(Math.ceil(lo)));
+      let best = -1, bv = 0;
+      for (let j = Math.ceil(lo); j <= Math.floor(hi); j++) if (sm[j] >= sm[j - 1] && sm[j] >= sm[j + 1] && sm[j] > bv) { bv = sm[j]; best = j; }
+      const prom = best > 0 ? bv / Math.max(1, base) : 0;
+      let w = best;
+      if (best > 0) { const a = sm[best - 1], b = sm[best], c = sm[best + 1], den = a - 2 * b + c; if (den) w = best + Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)); }
+      // colour of the band (between frame and candidate edge) vs just beyond the edge
+      let contrast = 0;
+      if (best > 0) {
+        const bandC = [], outC = [];
+        for (let k = 0; k < 16; k++) {
+          const tt = 0.2 + 0.6 * k / 15, bx = p0[0] + dx * tt, by = p0[1] + dy * tt;
+          bandC.push(sample(S, bx + nx * w * 0.5, by + ny * w * 0.5, [0, 0, 0]).slice()); outC.push(sample(S, bx + nx * (w + 3), by + ny * (w + 3), [0, 0, 0]).slice());
+        }
+        contrast = cdist([0, 1, 2].map(ch => median(bandC.map(v => v[ch]))), [0, 1, 2].map(ch => median(outC.map(v => v[ch]))));
+      }
+      res.push({ w, prom, nx, ny, contrast });
     }
-    if (sides.some(sd => sd.cons < 0.55 || sd.w < minSide * 0.02 || sd.w > minSide * 0.105)) return null;
-    const bm = [0, 1, 2].map(c => median(sides.map(sd => sd.bc[c])));
-    if (median(sides.map(sd => cdist(sd.bc, bm))) > 35) return null;          // same border colour all round
-    if (median(sides.map(sd => cdist(sd.ic, sd.bc))) < 30) return null;       // and it differs from what's inside
-    const lines = sides.map((sd, i) => { const p0 = q[i], p1 = q[(i + 1) % 4], L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
-      return { x: p0[0] + sd.nx * sd.w, y: p0[1] + sd.ny * sd.w, dx: (p1[0] - p0[0]) / L, dy: (p1[1] - p0[1]) / L }; });
+    if (globalThis.__dbgExpand) console.log('expand', res.map(r => [+r.w.toFixed(1), +r.prom.toFixed(2), Math.round(r.contrast)]), 'lo/hi', lo.toFixed(1), hi.toFixed(1));
+    const strong = res.filter(r => r.w > 0 && r.prom >= 2.2).length;
+    if (strong < 2 || res.some(r => !(r.w > 0) || r.prom < 1.35 || r.contrast < 15)) return null;
+    const ws = res.map(r => r.w); if (Math.max(...ws) / Math.min(...ws) > 2.2) return null;
+    const lines = res.map((r, i) => { const p0 = q[i], p1 = q[(i + 1) % 4], L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      return { x: p0[0] + r.nx * r.w, y: p0[1] + r.ny * r.w, dx: (p1[0] - p0[0]) / L, dy: (p1[1] - p0[1]) / L }; });
     const nq = [intersect(lines[3], lines[0]), intersect(lines[0], lines[1]), intersect(lines[1], lines[2]), intersect(lines[2], lines[3])];
     if (nq.some(p => !p)) return null;
-    const ns = quadStats(nq), r = ns.aspect > 1 ? 1 / ns.aspect : ns.aspect;
-    return Math.abs(r - CW / CH) < 0.05 ? nq : null;
+    const ns = quadStats(nq), r0 = ns.aspect > 1 ? 1 / ns.aspect : ns.aspect;
+    return Math.abs(r0 - CW / CH) < 0.05 ? nq : null;
   }
   function findCardQuad(img, maxDim, opts) {
     opts = opts || {};
@@ -785,8 +799,72 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     const top = cands[0].score, good = cands.filter(c => c.score >= top * 0.93);
     good.sort((x, y) => y.area - x.area);
     const pick = good[0], k = 1 / sm.scale;
-    const grown = expandToCard(S, pick.q), fq = grown || pick.q;
+    const grown = expandToCard(S, pick.q, G), fq = grown || pick.q;
     return { quad: orderPortrait(fq.map(p => [p[0] * k, p[1] * k])), score: pick.score, n: cands.length, grown: !!grown };
+  }
+
+
+  // Full-resolution check: is there an even band of one colour (a card border) around the quad, ending at the same kind
+  // of step on all four sides within 1.2–6.5 mm? Then the quad was the print frame and the step is the card's cut edge.
+  function expandFull(img, q, relaxed) {
+    const st = quadStats(q), ppm = ((st.left + st.right) / 2) / (CH - 5.5);   // inner frame is ~5.5 mm shorter than the card
+    const maxS = Math.ceil(8.2 * ppm), cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4, t = [0, 0, 0];
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+      const p0 = q[i], p1 = q[(i + 1) % 4], dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy); let nx = -dy / L, ny = dx / L;
+      const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2; if ((cx - mx) * nx + (cy - my) * ny > 0) { nx = -nx; ny = -ny; }
+      const prof = [], N = 30;
+      for (let s2 = 0; s2 <= maxS + 4; s2++) {
+        const acc = [0, 0, 0];
+        for (let k = 0; k < N; k++) { const tt = 0.2 + 0.6 * k / (N - 1); sample(img, p0[0] + dx * tt + nx * s2, p0[1] + dy * tt + ny * s2, t); acc[0] += t[0] / N; acc[1] += t[1] / N; acc[2] += t[2] / N; }
+        prof.push(acc);
+      }
+      const inside = [0, 0, 0]; for (let k = 0; k < N; k++) { const tt = 0.2 + 0.6 * k / (N - 1); sample(img, p0[0] + dx * tt - nx * 3, p0[1] + dy * tt - ny * 3, t); inside[0] += t[0] / N; inside[1] += t[1] / N; inside[2] += t[2] / N; }
+      const a0 = Math.max(2, Math.round(0.15 * ppm)), a1 = Math.max(a0 + 2, Math.round(0.8 * ppm));
+      const band = [0, 1, 2].map(ch => median(prof.slice(a0, a1 + 1).map(v => v[ch])));
+      const noise = median(prof.slice(a0, a1 + 1).map(v => cdist(v, band)));
+      const T = Math.max(7, 4 * noise + 3);
+      let w = -1;
+      // the edge is where the colour leaves the band and stays away for 1.1 mm (printed text in a border is shorter and returns)
+      const sus = Math.max(3, Math.round(1.1 * ppm));
+      for (let s2 = Math.round(1.2 * ppm); s2 <= Math.round(6.5 * ppm); s2++) {
+        let away = true; for (let j = 0; j < sus; j++) if (cdist(prof[Math.min(prof.length - 1, s2 + j)], band) <= T) { away = false; break; }
+        if (away) {
+          const d0 = cdist(prof[s2 - 1], band), d1 = cdist(prof[s2], band), mid = T / 2 + 0.5 * (Math.min(d1, 60) - T / 2);
+          w = s2 - 1 + Math.max(0, Math.min(1, (mid - d0) / Math.max(1e-3, d1 - d0))); break;
+        }
+      }
+      out.push({ w, nx, ny, frameStep: cdist(inside, band), prof });
+    }
+    // A side that disagrees with the others (printed text or a shadow in its band): take the strongest step near their width.
+    const okW = out.filter(o => o.w > 0).map(o => o.w);
+    if (okW.length >= 3) {
+      out.forEach((o, i) => {
+        const others = out.filter((u, j) => j !== i && u.w > 0).map(u => u.w); if (others.length < 3) return;
+        const prior = median(others);
+        if (o.w > 0 && Math.abs(o.w - prior) <= 0.35 * prior) return;
+        let best = -1, bv = 0; const P = o.prof;
+        for (let s2 = Math.max(Math.round(1.0 * ppm), Math.round(prior - 1.2 * ppm)); s2 <= Math.min(Math.round(6.5 * ppm), Math.round(prior + 1.2 * ppm)); s2++) {
+          // lasting change: mean colour of the 0.4 mm after vs the 0.4 mm before (thin printed text is only a short bump)
+          const win = Math.max(3, Math.round(0.4 * ppm)), avg = (a, b) => { const r = [0, 0, 0]; let n = 0; for (let j = Math.max(0, a); j <= Math.min(P.length - 1, b); j++) { r[0] += P[j][0]; r[1] += P[j][1]; r[2] += P[j][2]; n++; } return r.map(v => v / Math.max(1, n)); };
+          const v = cdist(avg(s2 + 1, s2 + win), avg(s2 - win, s2 - 1)); if (v > bv) { bv = v; best = s2; }
+        }
+        if (best > 0 && bv > 6) o.w = best;
+      });
+    }
+    if (globalThis.__dbgExpand) console.log('expandFull', out.map(o => [+(o.w / ppm).toFixed(2), Math.round(o.frameStep)]), 'ppm', ppm.toFixed(1));
+    if (relaxed) {
+      // user asked to snap outward: sides without a clear step take the median of the sides that have one
+      const found = out.filter(o => o.w > 0).map(o => o.w); if (found.length < 2) return null;
+      const m = median(found); out.forEach(o => { if (!(o.w > 0)) o.w = m; });
+    } else if (out.some(o => o.w < 0 || o.frameStep < 25)) return null;
+    const ws = out.map(o => o.w); if (Math.max(...ws) / Math.min(...ws) > 2.5) return null;
+    const lines = out.map((o, i) => { const p0 = q[i], p1 = q[(i + 1) % 4], L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      return { x: p0[0] + o.nx * o.w, y: p0[1] + o.ny * o.w, dx: (p1[0] - p0[0]) / L, dy: (p1[1] - p0[1]) / L }; });
+    const nq = [intersect(lines[3], lines[0]), intersect(lines[0], lines[1]), intersect(lines[1], lines[2]), intersect(lines[2], lines[3])];
+    if (nq.some(p => !p)) return null;
+    const ns = quadStats(nq), r0 = ns.aspect > 1 ? 1 / ns.aspect : ns.aspect;
+    return Math.abs(r0 - CW / CH) < (relaxed ? 0.08 : 0.045) ? nq : null;
   }
 
   // Full detection on a working image (~1600-2400px). opts.rough: quad guess in the same coords.
@@ -812,9 +890,18 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     if (!res) return { ok: false, reason: 'edges', rough: rq };
     const res2 = refine(img, res.quad, Math.max(near ? 3 : 6, band * (near ? 0.5 : 0.35)), rand, near);
     if (res2) res = res2;
+    let expanded = false;
+    if (opts.expand !== false) {
+      const big = expandFull(img, res.quad);
+      if (big) {
+        const r3 = refine(img, big, Math.max(3, 0.5 * quadStats(big).pxPerMm), rand, true);
+        res = r3 && r3.inl > 0.5 ? r3 : { quad: big, inl: res.inl, edgeWidthPx: res.edgeWidthPx };
+        expanded = true;
+      }
+    }
     const st = quadStats(res.quad);
     const aspectOk = Math.abs(st.aspect - CW / CH) < 0.07;
-    return { ok: aspectOk && res.inl > 0.5, quad: res.quad, conf: res.inl, aspect: st.aspect, stats: st, edgeWidthMm: res.edgeWidthPx / st.pxPerMm, rough: rq, info, reason: aspectOk ? '' : 'aspect' };
+    return { ok: aspectOk && res.inl > 0.5, quad: res.quad, conf: res.inl, aspect: st.aspect, stats: st, edgeWidthMm: res.edgeWidthPx / st.pxPerMm, rough: rq, info, expanded, reason: aspectOk ? '' : 'aspect' };
   }
 
   function toCanonical(img, quad) { return warp(img, quad, W, H); }
@@ -984,7 +1071,7 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     };
   }
 
-  const api = { findCardQuad, MM, CW, CH, W, H, R_MM, mkImg, median, downscale, sample, homography, applyH, warp, roughQuad, detectCard, refine, quadStats, toCanonical, measureBorders, borderSide, centering, share, analyzeCondition, zoneCenter, geo, stillQuality, insideDist, orderPortrait, rng };
+  const api = { expandFull, findCardQuad, MM, CW, CH, W, H, R_MM, mkImg, median, downscale, sample, homography, applyH, warp, roughQuad, detectCard, refine, quadStats, toCanonical, measureBorders, borderSide, centering, share, analyzeCondition, zoneCenter, geo, stillQuality, insideDist, orderPortrait, rng };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CV = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -1287,6 +1374,8 @@ function warningsFor(s) {
   else if (det.edgeWidthMm && det.edgeWidthMm > 0.45) w.push(['warn', 'The photo is a little soft. A sharper shot makes corner checks more reliable.']);
   const key = Math.max(Math.abs(1 - st.keyV), Math.abs(1 - st.keyH));
   if (key > 0.14) w.push(['warn', 'The phone was at a steep angle. Measurements are corrected for it, but a flat-on shot is more accurate.']);
+  const bl = ['L', 'R', 'T', 'B'].map(k => { const c = s.bInfo[k].color; return (c[0] + c[1] + c[2]) / 3; });
+  if (Math.max(...bl) / Math.max(1, Math.min(...bl)) > 1.45) w.push(['warn', 'One side of the card is darker, probably a shadow (often the phone\'s own). Hold the phone higher using 2× zoom, or move the light, then retake.']);
   if (s.cond.glare > 0.004) w.push(['warn', `Glare covers ${(s.cond.glare * 100).toFixed(1)}% of the card. Move the light to the side, then retake.`]);
   const cg = s.cond.corners.map((c, i) => c.glare ? ['top-left', 'top-right', 'bottom-right', 'bottom-left'][i] : null).filter(Boolean);
   if (cg.length) w.push(['warn', `Glare near the ${cg.join(' and ')} corner, so whitening there may be over-counted.`]);
@@ -1297,7 +1386,7 @@ function warningsFor(s) {
 }
 
 /* ---------- capture ---------- */
-const cam = { track: null, seed: null, worker: null, wBusy: false, lastSearch: 0, stream: null, video: null, raf: 0, lastA: 0, okSince: 0, prev: null, lap: [], busy: false, det: null, guide: null, crop: null, AW: 360 };
+const cam = { zoom: 1, hwZoom: false, track: null, seed: null, worker: null, wBusy: false, lastSearch: 0, stream: null, video: null, raf: 0, lastA: 0, okSince: 0, prev: null, lap: [], busy: false, det: null, guide: null, crop: null, AW: 360 };
 async function openCapture(step) {
   state.step = step; show('capture');
   $('#cap-title').textContent = step === 'front' ? 'Photograph the front' : 'Now the back';
@@ -1315,6 +1404,8 @@ async function startCamera() {
   cam.video = document.createElement('video'); cam.video.playsInline = true; cam.video.muted = true; cam.video.srcObject = cam.stream;
   try { await cam.video.play(); } catch (e) { stopCamera(); return fail(); }
   $('#live').hidden = false; $('#nolive').hidden = true;
+  let z0 = 1; try { z0 = +(localStorage.getItem('pregrade.zoom') || 1) || 1; } catch (e) {}
+  await setZoom(z0);
   cam.okSince = 0; cam.prev = null; cam.lap = []; cam.det = null; cam.track = null; cam.seed = null; cam.anchor = null; startWorker();
   cam.raf = requestAnimationFrame(frame);
 }
@@ -1346,6 +1437,18 @@ function startOrientation() {
     else if (D) listen();
   } catch (e) {}
 }
+// 2x zoom: use the camera's own zoom where the browser allows it, otherwise crop the centre of a high-resolution frame.
+async function setZoom(z) {
+  cam.zoom = z; cam.hwZoom = false;
+  const tr = cam.stream && cam.stream.getVideoTracks()[0];
+  try {
+    const caps = tr && tr.getCapabilities ? tr.getCapabilities() : {};
+    if (caps.zoom) { const v = Math.min(caps.zoom.max, Math.max(caps.zoom.min, z)); await tr.applyConstraints({ advanced: [{ zoom: v }] }); cam.hwZoom = v > 1 || z === 1; }
+  } catch (e) { cam.hwZoom = false; }
+  cam.track = null; cam.anchor = null; cam.seed = null; cam.okSince = 0;
+  document.querySelectorAll('#zoom-seg button').forEach(b => b.classList.toggle('on', +b.dataset.z === z));
+  try { localStorage.setItem('pregrade.zoom', String(z)); } catch (e) {}
+}
 function guideRect(W, H) { let gh = H * 0.8, gw = gh * 63 / 88; if (gw > W * 0.84) { gw = W * 0.84; gh = gw * 88 / 63; } return { x: (W - gw) / 2, y: (H - gh) / 2, w: gw, h: gh }; }
 function frame(t) {
   cam.raf = requestAnimationFrame(frame);
@@ -1355,6 +1458,7 @@ function frame(t) {
   if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
   const vr = v.videoWidth / v.videoHeight, cr = W / H; let sx, sy, sw, sh;
   if (vr > cr) { sh = v.videoHeight; sw = sh * cr; sx = (v.videoWidth - sw) / 2; sy = 0; } else { sw = v.videoWidth; sh = sw / cr; sx = 0; sy = (v.videoHeight - sh) / 2; }
+  if (cam.zoom > 1 && !cam.hwZoom) { const nw = sw / cam.zoom, nh = sh / cam.zoom; sx += (sw - nw) / 2; sy += (sh - nh) / 2; sw = nw; sh = nh; }
   cam.crop = { sx, sy, sw, sh, W, H };
   const x = cv.getContext('2d'); x.drawImage(v, sx, sy, sw, sh, 0, 0, W, H);
   const g = guideRect(W, H); cam.guide = g;
@@ -1409,7 +1513,7 @@ function analyzeLive() {
     let diff = 0; if (cam.prev && cam.prev.length === lum.length) { for (let i = 0; i < lum.length; i++) diff += Math.abs(lum[i] - cam.prev[i]); diff /= lum.length * 3; } else diff = 99;
     cam.prev = lum;
     let found = det.quad && det.conf > 0.6 && Math.abs(det.aspect - 63 / 88) < 0.06;
-    let light = 'ok', glare = 'ok', framing = 'bad', straight = 'bad', say = '', tiltHint = false;
+    let light = 'ok', glare = 'ok', framing = 'bad', straight = 'bad', say = '', tiltHint = false, shade = 'ok';
     if (found) {
       const q = det.quad, st = det.stats;
       // brightness & glare inside the card
@@ -1417,6 +1521,14 @@ function analyzeLive() {
       const x0 = Math.max(0, Math.min(...xs) | 0), x1 = Math.min(AW - 1, Math.max(...xs) | 0), y0 = Math.max(0, Math.min(...ys) | 0), y1 = Math.min(AH - 1, Math.max(...ys) | 0);
       for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) { const p = (y * AW + x) * 4, d = img.data; const mn = Math.min(d[p], d[p + 1], d[p + 2]); s += (d[p] + d[p + 1] + d[p + 2]) / 3; n++; if (mn > 242) gl++; }
       const br = s / n, gf = gl / n;
+      // Border ring brightness per side: the border is one colour, so a big difference means a shadow (often the phone's own).
+      const cx0 = xs.reduce((a, b) => a + b) / 4, cy0 = ys.reduce((a, b) => a + b) / 4, sideL = [];
+      for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4]; let acc = 0, m = 0;
+        for (let k = 1; k < 12; k++) { const t2 = k / 12, px = a[0] + (b[0] - a[0]) * t2, py = a[1] + (b[1] - a[1]) * t2, ix = Math.round(px + (cx0 - px) * 0.035), iy = Math.round(py + (cy0 - py) * 0.035);
+          if (ix < 0 || iy < 0 || ix >= AW || iy >= AH) continue; const p = (iy * AW + ix) * 4; acc += img.data[p] + img.data[p + 1] + img.data[p + 2]; m++; }
+        sideL.push(m ? acc / m / 3 : 0); }
+      const shadeR = Math.max(...sideL) / Math.max(1, Math.min(...sideL));
+      shade = shadeR > 1.6 ? 'bad' : shadeR > 1.35 ? 'warn' : 'ok';
       light = br < 70 ? 'bad' : br > 215 ? 'warn' : 'ok';
       glare = gf > 0.012 ? 'bad' : gf > 0.004 ? 'warn' : 'ok';
       const ch = (st.left + st.right) / 2, gh = g.h * k, cx = xs.reduce((a, b) => a + b) / 4, cy = ys.reduce((a, b) => a + b) / 4;
@@ -1430,6 +1542,7 @@ function analyzeLive() {
       tiltHint = straight === 'ok' && (kv > 0.06 || kh > 0.06 || ang > 5);
       if (light === 'bad') say = 'More light, please';
       else if (glare !== 'ok') say = 'Glare on the card. Move the light to one side';
+      else if (shade === 'bad') say = cam.zoom === 1 ? 'Part of the card is in shadow. Hold the phone higher and switch to 2×' : 'Part of the card is in shadow. Hold the phone higher or move the light';
       else if (framing === 'small') say = 'Move closer';
       else if (framing === 'big') say = 'Move back a little';
       else if (framing === 'off') say = 'Center the card in the guide';
@@ -1447,14 +1560,14 @@ function analyzeLive() {
     const lmax = Math.max(...cam.lap.map(e => e[1]));
     const focus = lv > 12 && lv >= 0.6 * lmax ? 'ok' : 'bad';
     const steady = diff < 5 ? 'ok' : diff < 9 ? 'warn' : 'bad';
-    if (!say && focus !== 'ok') say = 'Hold still while the camera focuses';
+    if (!say && focus !== 'ok') say = found && framing !== 'small' && cam.zoom === 1 ? 'Too close to focus? Step back and switch to 2×' : 'Hold still while the camera focuses';
     if (!say && steady !== 'ok') say = 'Hold steady';
     const lv2 = level.t && now - level.t < 1000 ? (Math.abs(level.beta) < 6 && Math.abs(level.gamma) < 6 ? 'ok' : 'warn') : null;
     if (!say && lv2 === 'warn' && straight !== 'ok') say = 'Hold the phone flat and level over the card';
-    const good = found && light !== 'bad' && glare !== 'bad' && framing === 'ok' && straight === 'ok' && focus === 'ok' && steady !== 'bad';
+    const good = found && light !== 'bad' && glare !== 'bad' && shade !== 'bad' && framing === 'ok' && straight === 'ok' && focus === 'ok' && steady !== 'bad';
     cam.det = det.quad ? { quad: det.quad, good, full: det } : null;
     const pill = (name, st) => `<span class="pill ${st === 'ok' ? 'ok' : st === 'warn' ? 'warn' : 'bad'}">${name}</span>`;
-    $('#checks').innerHTML = pill('Card found', found ? 'ok' : 'bad') + pill('Light', found ? light : 'warn') + pill('Glare', found ? glare : 'warn') + pill('Framing', framing === 'ok' ? 'ok' : 'bad') + pill('Angle', straight !== 'ok' ? 'bad' : tiltHint ? 'warn' : 'ok') + pill('Focus', focus) + pill('Steady', steady) + (lv2 ? pill('Phone level', lv2) : '');
+    $('#checks').innerHTML = pill('Card found', found ? 'ok' : 'bad') + pill('Light', found ? light : 'warn') + pill('Glare', found ? glare : 'warn') + pill('Framing', framing === 'ok' ? 'ok' : 'bad') + pill('Angle', straight !== 'ok' ? 'bad' : tiltHint ? 'warn' : 'ok') + pill('Even light', found ? shade : 'warn') + pill('Focus', focus) + pill('Steady', steady) + (lv2 ? pill('Phone level', lv2) : '');
     $('#say').textContent = good ? ($('#auto').checked ? 'Hold it… capturing' : 'Looks good. Tap the shutter') + (tiltHint ? ' (slight angle is fine, it gets straightened)' : '') : say;
     if (good) { if (!cam.okSince) cam.okSince = now; if ($('#auto').checked && now - cam.okSince > 900) captureLive(); }
     else cam.okSince = 0;
@@ -1763,6 +1876,13 @@ function bindReview() {
   $('#rv-outline').onclick = () => { rv.outline = true; rv.firstOutline = false; rv.olQuad = cur().quad.map(p => p.slice()); setOutlineUi(); };
   $('#ol-cancel').onclick = () => { rv.outline = false; setOutlineUi(); };
   $('#ol-retake').onclick = () => openCapture(state.step);
+  $('#ol-outer').onclick = async () => {
+    const s = cur(); busy('Finding the outer edge…'); await nextFrame();
+    const nq = CV.expandFull(s.img, CV.orderPortrait(rv.olQuad.map(p => p.slice())), true);
+    busy('');
+    if (nq) { const snap = CV.detectCard(s.img, { rough: nq, band: Math.max(3, CV.quadStats(nq).pxPerMm * 0.5), near: true, expand: false }); rv.olQuad = (snap.quad || nq).map(p => p.slice()); drawReview(); }
+    else { $('#rv-notes').innerHTML = '<li class="warn">Couldn\'t find a clear outer edge around the outline. Drag the corners onto the card\'s outer edge.</li>'; }
+  };
   $('#ol-apply').onclick = async () => {
     const s = cur(), nq = CV.orderPortrait(rv.olQuad.map(p => p.slice()));
     const changed = nq.some((p, i) => Math.hypot(p[0] - s.quad[i][0], p[1] - s.quad[i][1]) > 0.5);
@@ -2026,6 +2146,7 @@ $('#use-file').onclick = () => $('#f-pick').click();
 $('#f-cam').onchange = e => { const f = e.target.files[0]; e.target.value = ''; onFile(f); };
 $('#f-pick').onchange = e => { const f = e.target.files[0]; e.target.value = ''; onFile(f); };
 $('#shoot').onclick = () => captureLive();
+document.querySelectorAll('#zoom-seg button').forEach(b => b.onclick = () => setZoom(+b.dataset.z));
 $('#skip-back').onclick = () => { state.sides.back = null; openResults(); };
 $('#show-mask').onchange = renderDefects;
 $('#save').onclick = saveCurrent;
