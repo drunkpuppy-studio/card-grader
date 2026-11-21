@@ -1665,6 +1665,7 @@ function setOutlineUi() {
   $('#rv-stage').textContent = rv.outline ? 'Step 1 of 2 · card outline' : 'Step 2 of 2 · edge and border lines';
   $('#ol-retake').hidden = !rv.firstOutline || state.demo; $('#ol-cancel').hidden = rv.firstOutline;
   $('#ol-bar').hidden = !rv.outline; $('#rv-next').hidden = rv.outline;
+  $('#rv-next').textContent = state.editing ? 'Update grades' : state.step === 'front' ? 'Next: photograph the back' : 'See grades';
   ['#rv-retake', '#rv-outline', '#rv-reset'].forEach(s => $(s).hidden = rv.outline || (s === '#rv-retake' && state.demo));
   $('#ol-tools').hidden = !rv.outline; $('#bd-tools').hidden = rv.outline;
   $('#rv-help').textContent = rv.outline
