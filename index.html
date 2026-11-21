@@ -119,6 +119,27 @@ button.hitem { cursor: pointer; }
 .ratio .val { font-family: var(--mono); font-weight: 600; font-size: 17px; }
 .ratio .lbl { font-size: 12px; color: var(--muted); }
 .ratio .dir { font-size: 12.5px; color: var(--ink); }
+.defects { display: flex; flex-direction: column; gap: 10px; }
+.defect { display: grid; grid-template-columns: 104px 1fr; gap: 12px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.defect .dthumb { width: 104px; height: 104px; border-radius: 8px; background: #111; display: block; }
+.defect .dinfo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.defect.off { background: #F6F7F4; } .defect.off .dthumb { opacity: .55; } .defect.off b { color: var(--muted); }
+.tools { display: flex; flex-direction: column; gap: 10px; }
+.ctiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ctile { appearance: none; border: 2px solid var(--line); border-radius: 10px; padding: 0; background: #111; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; }
+.ctile canvas { width: 100%; aspect-ratio: 1; display: block; }
+.ctile span { background: var(--card); color: var(--ink); font-size: 12px; padding: 4px; text-align: center; }
+.ctile.on { border-color: var(--volt); box-shadow: 0 0 0 2px var(--volt); }
+.dpad { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: #F6F7F4; }
+.dpad-keys { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 40px); gap: 4px; }
+.dpad-keys .btn { min-height: 40px; padding: 0; }
+#dp-u { grid-column: 2; grid-row: 1; } #dp-l { grid-column: 1; grid-row: 2; } #dp-d { grid-column: 2; grid-row: 2; } #dp-r { grid-column: 3; grid-row: 2; }
+#cu { width: 100%; height: auto; aspect-ratio: 5/3; border-radius: 10px; background: #111; touch-action: none; display: block; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+.seg button { appearance: none; border: 0; background: transparent; padding: 8px 12px; min-height: 38px; color: var(--ink); cursor: pointer; font-weight: 500; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--ink); color: #fff; }
+#cu-sides { width: 100%; } #cu-sides button { flex: 1; }
 .nudge { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: #F6F7F4; }
 .nudge .btn { min-height: 40px; padding: 8px 12px; font-family: var(--mono); font-size: 13px; }
 
@@ -250,11 +271,29 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
         <canvas class="main" id="rv"></canvas>
         <canvas class="loupe" id="loupe" width="256" height="256"></canvas>
       </div>
-      <div class="legend" id="line-legend"><span style="--c:#12A150">Card edge (outer)</span><span style="--c:#1F3FD1">Print border edge (inner)</span></div>
-      <div class="nudge" id="nudge"><span id="nudge-name" class="small">Tap a line to fine-tune it</span><div class="row" style="gap:6px"><button class="btn" id="nudge-minus" type="button" disabled>◀ 0.05 mm</button><button class="btn" id="nudge-plus" type="button" disabled>0.05 mm ▶</button></div></div>
-      <p class="small muted" id="rv-help">Drag a blue line onto the inner edge of the border. The loupe shows the detail under your finger.</p>
+      <p class="small muted" id="rv-help"></p>
+      <div id="ol-tools" class="tools">
+        <div class="ctiles">
+          <button class="ctile" id="ctb-0" type="button"><canvas id="ct-0" width="240" height="240"></canvas><span>Top-left</span></button>
+          <button class="ctile" id="ctb-1" type="button"><canvas id="ct-1" width="240" height="240"></canvas><span>Top-right</span></button>
+          <button class="ctile" id="ctb-3" type="button"><canvas id="ct-3" width="240" height="240"></canvas><span>Bottom-left</span></button>
+          <button class="ctile" id="ctb-2" type="button"><canvas id="ct-2" width="240" height="240"></canvas><span>Bottom-right</span></button>
+        </div>
+        <div class="dpad"><span class="small" id="dp-name"></span>
+          <div class="dpad-keys"><button class="btn" id="dp-u" type="button" aria-label="Move up">▲</button><button class="btn" id="dp-l" type="button" aria-label="Move left">◀</button><button class="btn" id="dp-d" type="button" aria-label="Move down">▼</button><button class="btn" id="dp-r" type="button" aria-label="Move right">▶</button></div>
+        </div>
+      </div>
+      <div id="bd-tools" class="tools">
+        <div class="legend" id="line-legend"><span style="--c:#19C163">Card edge (outer)</span><span style="--c:#2F55FF">Print border edge (inner)</span><span style="--c:#F2C531">Close-up area</span></div>
+        <div class="seg" id="cu-sides"><button type="button" data-k="L">Left</button><button type="button" data-k="R">Right</button><button type="button" data-k="T">Top</button><button type="button" data-k="B">Bottom</button></div>
+        <canvas id="cu" width="600" height="360"></canvas>
+        <div class="row" style="justify-content:space-between;gap:8px">
+          <div class="seg small" id="cu-pos"><button type="button">Top</button><button type="button">Middle</button><button type="button">Bottom</button></div>
+        </div>
+        <div class="nudge" id="nudge"><span id="nudge-name" class="small"></span><div class="row" style="gap:6px"><button class="btn" id="nudge-minus" type="button">◀ 0.05 mm</button><button class="btn" id="nudge-plus" type="button">0.05 mm ▶</button></div></div>
       <div class="readout" id="readout"></div>
       <div class="ratios" id="ratios"></div>
+      </div>
     </div>
     <div class="row">
       <button class="btn" id="rv-retake" type="button">Retake</button>
@@ -290,12 +329,13 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
 
     <div class="panel">
       <div class="row" style="justify-content:space-between">
-        <h2>Corners and edges up close</h2>
+        <h2>Check what was flagged <span class="small muted" id="defect-count"></span></h2>
         <label class="switch small"><input type="checkbox" id="show-mask" checked> Highlight</label>
       </div>
+      <p class="small muted">Look at your card in hand under a lamp. Keep what you can see, dismiss what you can't. Grades update straight away.</p>
       <div class="legend"><span style="--c:#E0249A">Whitening</span><span style="--c:#10B5D6">Spot or scratch in border</span><span style="--c:#F2A900">Glare</span></div>
       <div class="cards" id="cards"></div>
-      <div id="zooms"></div>
+      <div id="defects" class="defects"></div>
     </div>
 
     <div class="panel">
@@ -707,7 +747,8 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     const ns = quadStats(nq), r = ns.aspect > 1 ? 1 / ns.aspect : ns.aspect;
     return Math.abs(r - CW / CH) < 0.05 ? nq : null;
   }
-  function findCardQuad(img, maxDim) {
+  function findCardQuad(img, maxDim, opts) {
+    opts = opts || {};
     const sm = downscale(img, maxDim || 480), S = sm.img, G = gradients(S), E = edgePixels(G);
     if (E.pts.length < 50) return null;
     const { vert, hori } = houghLines(G, E);
@@ -724,13 +765,13 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
         if (q.some(p => !p || p[0] < -W0 * 0.03 || p[1] < -H0 * 0.03 || p[0] > W0 * 1.03 || p[1] > H0 * 1.03)) continue;
         const st = quadStats(q), ar = st.aspect, area = polyArea(q);
         const portrait = ar > 0.6 && ar < 0.84, landscape = ar > 1.19 && ar < 1.67;
-        if (!portrait && !landscape) continue;
+        if (!portrait && (!landscape || opts.portrait)) continue;
         if (area < area0 * 0.05) continue;
         if (Math.max(st.keyV, 1 / st.keyV, st.keyH, 1 / st.keyH) > 1.3) continue;
         const sup = [support(G, E.thr, q[0], q[1]), support(G, E.thr, q[1], q[2]), support(G, E.thr, q[2], q[3]), support(G, E.thr, q[3], q[0])];
         const mn = Math.min(...sup), mean = (sup[0] + sup[1] + sup[2] + sup[3]) / 4;
         if (mn < 0.45) continue;
-        const target = portrait ? CW / CH : CH / CW, aspPen = 1 - Math.min(0.5, Math.abs(ar - target) * 2);
+        const target = portrait ? CW / CH : CH / CW, aspPen = (1 - Math.min(0.5, Math.abs(ar - target) * 2)) * (portrait ? 1 : 0.75);
         const off = Math.max(1.5, Math.min(st.left, st.right, st.top, st.bot) * 0.016);
         const rg = ring(S, q, off);
         const run = [0, 1, 2, 3].map(i => runOn(G, E.thr, q[i], q[(i + 1) % 4])), excl = 1 - Math.max(...run) * 0.6 - (run.reduce((a, b) => a + b, 0) / 4) * 0.4;
@@ -849,47 +890,83 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     if (inX && inY) { const cx = px < r ? r : W - r, cy = py < r ? r : H - r; return r - Math.hypot(px - cx, py - cy); }
     return Math.min(px, W - px, py, H - py);
   }
-  function analyzeCondition(c, borders) {
-    const d = c.data, Z = 6 * MM; // corner zone size
-    const bw = { L: borders.L.px || 30, R: borders.R.px || 30, T: borders.T.px || 30, B: borders.B.px || 30 };
-    const col = { L: borders.L.color, R: borders.R.color, T: borders.T.color, B: borders.B.color };
-    const cz = [[0, 0], [0, 0], [0, 0], [0, 0]], ez = [[0, 0], [0, 0], [0, 0], [0, 0]]; // [white, total]
-    const cg = [0, 0, 0, 0];  // glare-like pixels deeper in border near each corner
-    const mask = new Uint8Array(W * H); // 1 whitening, 2 surface anomaly, 3 glare
-    let surfA = 0, surfN = 0, glare = 0, tot = 0;
-    const s0 = 0.25 * MM, s1 = 1.0 * MM;
+  // Static geometry of the straightened card: distance inside the edge, nearest side, corner zone.
+  let GEO = null;
+  function geo() {
+    if (GEO) return GEO;
+    const N = W * H, dd = new Float32Array(N), sd = new Uint8Array(N), cr = new Int8Array(N), Z = 6 * MM;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const dd = insideDist(x, y); if (dd < 0) continue;
-      const p = (y * W + x) * 4, r = d[p], g = d[p + 1], b = d[p + 2], mn = Math.min(r, g, b), mx = Math.max(r, g, b);
-      tot++;
-      if (mn > 246 && mx >= 252) { glare++; }
-      // nearest side
-      const dl = x, dr = W - 1 - x, dt = y, db = H - 1 - y, m = Math.min(dl, dr, dt, db);
-      const side = m === dl ? 'L' : m === dr ? 'R' : m === dt ? 'T' : 'B';
-      const bc = col[side];
-      const corner = (x < Z || x >= W - Z) && (y < Z || y >= H - Z) ? (y < Z ? (x < Z ? 0 : 1) : (x < Z ? 3 : 2)) : -1;
-      if (dd >= s0 && dd <= s1) {
-        const m0 = Math.min(bc[0], bc[1], bc[2]), L0 = (bc[0] + bc[1] + bc[2]) / 3, L = (r + g + b) / 3;
-        const wh = (mn - m0) / (256 - m0);
-        const white = wh > 0.35 && L > L0 && mn > 150;
-        if (white) mask[y * W + x] = 1;
-        if (corner >= 0) { cz[corner][1]++; if (white) cz[corner][0]++; }
-        else { const ei = side === 'T' ? 0 : side === 'R' ? 1 : side === 'B' ? 2 : 3; ez[ei][1]++; if (white) ez[ei][0]++; }
-      } else if (dd > 1.3 * MM && m < bw[side] - 0.6 * MM) {
-        // inside the plain border band: look for spots / scratches / glare
-        surfN++;
-        const dist = cdist([r, g, b], bc);
-        if (mn > 246 && mx >= 252) { mask[y * W + x] = 3; if (corner >= 0) cg[corner]++; }
-        else if (dist > 55) { surfA++; mask[y * W + x] = 2; }
+      const i = y * W + x, dl = x, dr = W - 1 - x, dt = y, db = H - 1 - y, m = Math.min(dl, dr, dt, db);
+      dd[i] = insideDist(x, y); sd[i] = m === dl ? 0 : m === dr ? 1 : m === dt ? 2 : 3;
+      cr[i] = (x < Z || x >= W - Z) && (y < Z || y >= H - Z) ? (y < Z ? (x < Z ? 0 : 1) : (x < Z ? 3 : 2)) : -1;
+    }
+    GEO = { dd, sd, cr, Z }; return GEO;
+  }
+  const SIDE_TO_EDGE = [3, 1, 0, 2];               // L,R,T,B -> edges listed T,R,B,L
+  const CORNER_SIDES = [[0, 2], [1, 2], [1, 3], [0, 3]]; // TL,TR,BR,BL -> adjacent sides
+  // Whitening = edge pixels clearly whiter than that edge's own typical colour, in clusters (holo sparkle is scattered single pixels).
+  // Surface = spots in the plain border band; sides whose band has artwork or holo pattern in it are not assessed.
+  function analyzeCondition(c, borders) {
+    const { dd, sd, cr } = geo(), d = c.data, N = W * H;
+    const SK = ['L', 'R', 'T', 'B'], bw = SK.map(k => borders[k].px || 30);
+    const s0 = 0.25 * MM, s1 = 1.0 * MM, b0 = 1.3 * MM;
+    const strip = [[], [], [], []], band = [[], [], [], []];
+    for (let i = 0; i < N; i += 3) {
+      const v = dd[i]; if (v < 0) continue; const p = i * 4, col = [d[p], d[p + 1], d[p + 2]];
+      if (v >= s0 && v <= s1 && cr[i] < 0) strip[sd[i]].push(col);
+      else if (v > b0 && v < bw[sd[i]] - 0.6 * MM) band[sd[i]].push(col);
+    }
+    const med = arr => arr.length ? [0, 1, 2].map(ch => median(arr.map(v => v[ch]))) : [128, 128, 128];
+    const sref = strip.map(med), bmed = band.map(med);
+    const bvar = band.map((arr, k) => arr.length ? median(arr.map(v => cdist(v, bmed[k]))) : 99);
+    const bp90 = band.map((arr, k) => arr.length ? pct(arr.map(v => cdist(v, bmed[k])), 0.9) : 99);
+    const skip = band.map((arr, k) => arr.length < 200 || bvar[k] > 16 || bp90[k] > 38);
+    const cref = CORNER_SIDES.map(([a, b2]) => [0, 1, 2].map(ch => (sref[a][ch] + sref[b2][ch]) / 2));
+    const candW = new Uint8Array(N), candS = new Uint8Array(N), mask = new Uint8Array(N);
+    const zt = { c: [0, 0, 0, 0], e: [0, 0, 0, 0], s: [0, 0, 0, 0] }, zw = { c: [0, 0, 0, 0], e: [0, 0, 0, 0], s: [0, 0, 0, 0] };
+    let glare = 0, tot = 0; const cg = [0, 0, 0, 0];
+    for (let i = 0; i < N; i++) {
+      const v = dd[i]; if (v < 0) continue; tot++;
+      const p = i * 4, r = d[p], g = d[p + 1], b = d[p + 2], mn = Math.min(r, g, b), mx = Math.max(r, g, b);
+      const isGlare = mn > 246 && mx >= 252; if (isGlare) glare++;
+      if (v >= s0 && v <= s1) {
+        const ref = cr[i] >= 0 ? cref[cr[i]] : sref[sd[i]], m0 = Math.min(ref[0], ref[1], ref[2]), L0 = (ref[0] + ref[1] + ref[2]) / 3;
+        const wh = (mn - m0) / (256 - m0), L = (r + g + b) / 3;
+        if (wh > 0.3 && L > L0 + 18 && mn > 140) candW[i] = 1;
+        if (cr[i] >= 0) zt.c[cr[i]]++; else zt.e[SIDE_TO_EDGE[sd[i]]]++;
+      } else if (v > b0 && v < bw[sd[i]] - 0.6 * MM && !skip[sd[i]]) {
+        zt.s[sd[i]]++;
+        if (isGlare) { mask[i] = 3; if (cr[i] >= 0) cg[cr[i]]++; }
+        else if (cdist([r, g, b], bmed[sd[i]]) > 45) candS[i] = 1;
       }
     }
+    // keep only clustered candidates: at least 5 of the 3x3 neighbourhood
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const i = y * W + x; if (!candW[i] && !candS[i]) continue;
+      const arr = candW[i] ? candW : candS; let n = 0;
+      for (let oy = -W; oy <= W; oy += W) for (let ox = -1; ox <= 1; ox++) n += arr[i + oy + ox];
+      if (n < (candW[i] ? 6 : 7)) continue;
+      if (candW[i]) { mask[i] = 1; if (cr[i] >= 0) zw.c[cr[i]]++; else zw.e[SIDE_TO_EDGE[sd[i]]]++; }
+      else { mask[i] = 2; zw.s[sd[i]]++; }
+    }
+    let sa = 0, sn = 0; for (let k = 0; k < 4; k++) if (!skip[k]) { sa += zw.s[k]; sn += zt.s[k]; }
     return {
-      corners: cz.map((v, i) => ({ frac: v[1] ? v[0] / v[1] : 0, glare: cg[i] > 25 })),
-      edges: ez.map(v => ({ frac: v[1] ? v[0] / v[1] : 0 })),
-      surface: { frac: surfN ? surfA / surfN : 0 },
+      corners: zw.c.map((w, i) => ({ frac: zt.c[i] ? w / zt.c[i] : 0, glare: cg[i] > 25 })),
+      edges: zw.e.map((w, i) => ({ frac: zt.e[i] ? w / zt.e[i] : 0 })),
+      surface: { frac: sn ? sa / sn : 0, sides: SK.map((k, i) => ({ a: zw.s[i], n: zt.s[i], skipped: skip[i] })) },
       glare: tot ? glare / tot : 0,
       mask
     };
+  }
+  // Pixel positions of flagged defects in one zone: kind 'c' corner (0..3 TL,TR,BR,BL), 'e' edge (0..3 T,R,B,L), 's' surface side (0..3 L,R,T,B)
+  function zoneCenter(cond, kind, idx) {
+    const { sd, cr } = geo(), m = cond.mask, xs = [], ys = [];
+    for (let i = 0; i < m.length; i++) {
+      const v = m[i]; if (!v) continue;
+      const ok = kind === 'c' ? v === 1 && cr[i] === idx : kind === 'e' ? v === 1 && cr[i] < 0 && SIDE_TO_EDGE[sd[i]] === idx : v === 2 && sd[i] === idx;
+      if (ok) { xs.push(i % W); ys.push((i / W) | 0); }
+    }
+    return xs.length ? [median(xs), median(ys), xs.length] : null;
   }
 
   function stillQuality(det, c) {
@@ -907,7 +984,7 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     };
   }
 
-  const api = { findCardQuad, MM, CW, CH, W, H, R_MM, mkImg, median, downscale, sample, homography, applyH, warp, roughQuad, detectCard, refine, quadStats, toCanonical, measureBorders, borderSide, centering, share, analyzeCondition, stillQuality, insideDist, orderPortrait, rng };
+  const api = { findCardQuad, MM, CW, CH, W, H, R_MM, mkImg, median, downscale, sample, homography, applyH, warp, roughQuad, detectCard, refine, quadStats, toCanonical, measureBorders, borderSide, centering, share, analyzeCondition, zoneCenter, geo, stillQuality, insideDist, orderPortrait, rng };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CV = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -925,7 +1002,7 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
   const MAP = {
     corner: [[0, 1000], [0.004, 985], [0.012, 950], [0.03, 900], [0.06, 850], [0.10, 800], [0.15, 750], [0.22, 700], [0.30, 600], [0.40, 500], [0.6, 300], [1, 100]],
     edge: [[0, 1000], [0.002, 985], [0.006, 950], [0.015, 900], [0.03, 850], [0.06, 800], [0.10, 750], [0.16, 700], [0.25, 600], [0.4, 400], [1, 100]],
-    surface: [[0, 1000], [0.0015, 985], [0.004, 950], [0.01, 900], [0.02, 850], [0.04, 800], [0.08, 750], [0.15, 650], [0.3, 450], [1, 100]]
+    surface: [[0, 1000], [0.008, 985], [0.015, 950], [0.025, 900], [0.04, 850], [0.07, 800], [0.12, 750], [0.2, 650], [0.35, 450], [1, 100]]
   };
   const sub = pts => pts >= 980 ? 10 : clamp(fh(pts / 100), 1, 9.5);
 
@@ -1209,7 +1286,7 @@ function warningsFor(s) {
   if (det.edgeWidthMm && det.edgeWidthMm > 0.7) w.push(['bad', 'The photo is blurry. Tap to focus on the card and hold still.']);
   else if (det.edgeWidthMm && det.edgeWidthMm > 0.45) w.push(['warn', 'The photo is a little soft. A sharper shot makes corner checks more reliable.']);
   const key = Math.max(Math.abs(1 - st.keyV), Math.abs(1 - st.keyH));
-  if (key > 0.08) w.push(['warn', 'The phone was at an angle. Measurements are corrected for it, but a flat-on shot is more accurate.']);
+  if (key > 0.14) w.push(['warn', 'The phone was at a steep angle. Measurements are corrected for it, but a flat-on shot is more accurate.']);
   if (s.cond.glare > 0.004) w.push(['warn', `Glare covers ${(s.cond.glare * 100).toFixed(1)}% of the card. Move the light to the side, then retake.`]);
   const cg = s.cond.corners.map((c, i) => c.glare ? ['top-left', 'top-right', 'bottom-right', 'bottom-left'][i] : null).filter(Boolean);
   if (cg.length) w.push(['warn', `Glare near the ${cg.join(' and ')} corner, so whitening there may be over-counted.`]);
@@ -1252,7 +1329,7 @@ function startWorker() {
   try {
     const src = document.getElementById('cv-src').textContent + `
       onmessage = e => { const d = e.data, img = { width: d.w, height: d.h, data: new Uint8ClampedArray(d.buf) };
-        let r = null; try { r = CV.findCardQuad(img, 360); } catch (err) {}
+        let r = null; try { r = CV.findCardQuad(img, 360, { portrait: true }); } catch (err) {}
         postMessage({ quad: r && r.quad, score: r ? r.score : 0, k: d.k }); };`;
     cam.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
     cam.worker.onmessage = e => { cam.wBusy = false; if (e.data.quad && e.data.score > 0.2 && e.data.k === cam.AW) cam.seed = e.data.quad; };
@@ -1323,7 +1400,7 @@ function analyzeLive() {
     if (nowS - cam.lastSearch > 350) {
       cam.lastSearch = nowS;
       if (cam.worker && !cam.wBusy) { cam.wBusy = true; const copy = new Uint8ClampedArray(img.data); cam.worker.postMessage({ w: AW, h: AH, buf: copy.buffer, k: AW }, [copy.buffer]); }
-      else if (!cam.worker && (!cam.lastMain || nowS - cam.lastMain > 1500)) { cam.lastMain = nowS; const r = CV.findCardQuad(img, 300); if (r) cam.seed = r.quad; }
+      else if (!cam.worker && (!cam.lastMain || nowS - cam.lastMain > 1500)) { cam.lastMain = nowS; const r = CV.findCardQuad(img, 300, { portrait: true }); if (r) cam.seed = r.quad; }
     }
     if (!det) det = CV.detectCard(img, { rough: gq, band: AH * 0.09 });
     const checks = [];
@@ -1332,7 +1409,7 @@ function analyzeLive() {
     let diff = 0; if (cam.prev && cam.prev.length === lum.length) { for (let i = 0; i < lum.length; i++) diff += Math.abs(lum[i] - cam.prev[i]); diff /= lum.length * 3; } else diff = 99;
     cam.prev = lum;
     let found = det.quad && det.conf > 0.6 && Math.abs(det.aspect - 63 / 88) < 0.06;
-    let light = 'ok', glare = 'ok', framing = 'bad', straight = 'bad', say = '';
+    let light = 'ok', glare = 'ok', framing = 'bad', straight = 'bad', say = '', tiltHint = false;
     if (found) {
       const q = det.quad, st = det.stats;
       // brightness & glare inside the card
@@ -1344,9 +1421,13 @@ function analyzeLive() {
       glare = gf > 0.012 ? 'bad' : gf > 0.004 ? 'warn' : 'ok';
       const ch = (st.left + st.right) / 2, gh = g.h * k, cx = xs.reduce((a, b) => a + b) / 4, cy = ys.reduce((a, b) => a + b) / 4;
       const off = Math.hypot(cx - (g.x + g.w / 2) * k, cy - (g.y + g.h / 2) * k) / gh;
-      framing = ch / gh < 0.82 ? 'small' : ch / gh > 1.1 ? 'big' : off > 0.06 ? 'off' : 'ok';
+      framing = ch / gh < 0.72 ? 'small' : ch / gh > 1.12 ? 'big' : off > 0.1 ? 'off' : 'ok';
       const keyV = st.keyV, keyH = st.keyH;
-      straight = Math.abs(st.angle) > 3 ? 'rot' : Math.abs(1 - keyV) > 0.035 ? (keyV < 1 ? 'top' : 'bottom') : Math.abs(1 - keyH) > 0.035 ? (keyH < 1 ? 'left' : 'right') : 'ok';
+      // The photo is straightened mathematically before measuring, so a small tilt costs no accuracy.
+      // Only a strong angle blocks capture (it blurs one end and lowers detail); a mild one is just a hint.
+      const kv = Math.abs(1 - keyV), kh = Math.abs(1 - keyH), ang = Math.abs(st.angle);
+      straight = ang > 10 ? 'rot' : kv > 0.12 ? (keyV < 1 ? 'top' : 'bottom') : kh > 0.12 ? (keyH < 1 ? 'left' : 'right') : 'ok';
+      tiltHint = straight === 'ok' && (kv > 0.06 || kh > 0.06 || ang > 5);
       if (light === 'bad') say = 'More light, please';
       else if (glare !== 'ok') say = 'Glare on the card. Move the light to one side';
       else if (framing === 'small') say = 'Move closer';
@@ -1365,25 +1446,35 @@ function analyzeLive() {
     cam.lap.push([now, lv]); cam.lap = cam.lap.filter(e => now - e[0] < 5000);
     const lmax = Math.max(...cam.lap.map(e => e[1]));
     const focus = lv > 12 && lv >= 0.6 * lmax ? 'ok' : 'bad';
-    const steady = diff < 3.5 ? 'ok' : diff < 7 ? 'warn' : 'bad';
+    const steady = diff < 5 ? 'ok' : diff < 9 ? 'warn' : 'bad';
     if (!say && focus !== 'ok') say = 'Hold still while the camera focuses';
     if (!say && steady !== 'ok') say = 'Hold steady';
     const lv2 = level.t && now - level.t < 1000 ? (Math.abs(level.beta) < 6 && Math.abs(level.gamma) < 6 ? 'ok' : 'warn') : null;
     if (!say && lv2 === 'warn' && straight !== 'ok') say = 'Hold the phone flat and level over the card';
-    const good = found && light !== 'bad' && glare === 'ok' && framing === 'ok' && straight === 'ok' && focus === 'ok' && steady === 'ok';
+    const good = found && light !== 'bad' && glare !== 'bad' && framing === 'ok' && straight === 'ok' && focus === 'ok' && steady !== 'bad';
     cam.det = det.quad ? { quad: det.quad, good, full: det } : null;
     const pill = (name, st) => `<span class="pill ${st === 'ok' ? 'ok' : st === 'warn' ? 'warn' : 'bad'}">${name}</span>`;
-    $('#checks').innerHTML = pill('Card found', found ? 'ok' : 'bad') + pill('Light', found ? light : 'warn') + pill('Glare', found ? glare : 'warn') + pill('Framing', framing === 'ok' ? 'ok' : 'bad') + pill('Straight', straight === 'ok' ? 'ok' : 'bad') + pill('Focus', focus) + pill('Steady', steady) + (lv2 ? pill('Phone level', lv2) : '');
-    $('#say').textContent = good ? ($('#auto').checked ? 'Hold it… capturing' : 'Looks good. Tap the shutter') : say;
+    $('#checks').innerHTML = pill('Card found', found ? 'ok' : 'bad') + pill('Light', found ? light : 'warn') + pill('Glare', found ? glare : 'warn') + pill('Framing', framing === 'ok' ? 'ok' : 'bad') + pill('Angle', straight !== 'ok' ? 'bad' : tiltHint ? 'warn' : 'ok') + pill('Focus', focus) + pill('Steady', steady) + (lv2 ? pill('Phone level', lv2) : '');
+    $('#say').textContent = good ? ($('#auto').checked ? 'Hold it… capturing' : 'Looks good. Tap the shutter') + (tiltHint ? ' (slight angle is fine, it gets straightened)' : '') : say;
     if (good) { if (!cam.okSince) cam.okSince = now; if ($('#auto').checked && now - cam.okSince > 900) captureLive(); }
     else cam.okSince = 0;
   } finally { cam.busy = false; }
 }
 async function captureLive() {
-  const v = cam.video, c = cam.crop; if (!v || !c) return;
-  const det = cam.det; cam.okSince = 0;
-  const loaded = drawToImg(v, v.videoWidth, v.videoHeight, c);
-  stopCamera();
+  const v = cam.video, c = cam.crop; if (!v || !c || cam.capturing) return;
+  cam.capturing = true; const det = cam.det; cam.okSince = 0;
+  $('#say').textContent = 'Capturing…';
+  // Burst of three frames ~100 ms apart; keep the sharpest one.
+  const shots = [];
+  for (let i = 0; i < 3; i++) {
+    const L = drawToImg(v, v.videoWidth, v.videoHeight, c), cx = L.canvas.getContext('2d');
+    const w = Math.min(320, L.canvas.width), h = Math.min(320, L.canvas.height);
+    shots.push({ L, sharp: lapVar(cx.getImageData((L.canvas.width - w) >> 1, (L.canvas.height - h) >> 1, w, h)) });
+    if (i < 2) await new Promise(r => setTimeout(r, 100));
+  }
+  shots.sort((a, b) => b.sharp - a.sharp);
+  const loaded = shots[0].L;
+  stopCamera(); cam.capturing = false;
   busy('Measuring…'); await nextFrame();
   let rough = null;
   if (det && det.quad) { const k = loaded.img.width / cam.AW; rough = det.quad.map(p => [p[0] * k, p[1] * k]); }
@@ -1400,32 +1491,36 @@ async function onFile(file) {
 function alertBox(msg) { $('#nolive-msg').textContent = msg; }
 
 /* ---------- review ---------- */
-// Review view = straightened card plus PAD px of background, so the card's cut edge can be adjusted too.
-// Per side there are two lines: the card edge (outer, solid green) and the print border edge (inner, dashed blue).
+// Step 1 (outline): the photo with the card outline; four corner points, each with zoomed tiles and arrow nudges.
+// Step 2 (borders): straightened card plus PAD px of background. Per side two hairlines: the card's cut edge (green)
+// and the inner edge of the printed border (blue dashed). A zoomed close-up of the selected side lets you place them precisely.
 const PAD = 40;
-const rv = { drag: null, sel: null, outline: false, olQuad: null, olScale: 1 };
+const rv = { drag: null, sel: 'iL', outline: false, olQuad: null, olScale: 1, corner: 0, cuPos: 0.5, cu: null, cuFreeze: null };
 const SIDE_NAME = { L: 'left', R: 'right', T: 'top', B: 'bottom' };
+const CORNER_NAME = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'];
+const TILE_ORDER = [0, 1, 3, 2]; // shown as a 2x2 grid: TL TR / BL BR
 function cur() { return state.sides[state.step]; }
+function cssK(c) { const r = c.getBoundingClientRect(); return r.width ? c.width / r.width : 2; }
 function canonToPhoto(s) { return CV.homography([[0, 0], [CV.W, 0], [CV.W, CV.H], [0, CV.H]], s.quad); }
 function ensureView(s) {
   if (s.view) return;
   const Hm = canonToPhoto(s), VW = CV.W + 2 * PAD, VH = CV.H + 2 * PAD;
   const q = [[-PAD, -PAD], [CV.W + PAD, -PAD], [CV.W + PAD, CV.H + PAD], [-PAD, CV.H + PAD]].map(p => CV.applyH(Hm, p[0], p[1]));
   s.view = CV.warp(s.img, q, VW, VH);
+  s.viewCanvas = canvasOf(VW, VH); putImg(s.viewCanvas, s.view);
   s.o = { L: 0, R: 0, T: 0, B: 0 };
 }
-// Border widths currently shown: inner line minus outer line.
 function widths(s) { const o = s.o || { L: 0, R: 0, T: 0, B: 0 }; return { L: s.b.L - o.L, R: s.b.R - o.R, T: s.b.T - o.T, B: s.b.B - o.B }; }
-// Line positions in view coords. id: 'oL' outer-left, 'iL' inner-left, etc.
 function linePos(s, id) {
-  const o = s.o, b = s.b, k = id[1], inner = id[0] === 'i', v = inner ? b[k] : o[k];
-  if (k === 'L') return PAD + v; if (k === 'R') return PAD + CV.W - v; if (k === 'T') return PAD + v; return PAD + CV.H - v;
+  const k = id[1], v = id[0] === 'i' ? s.b[k] : s.o[k];
+  if (k === 'L' || k === 'T') return PAD + v; if (k === 'R') return PAD + CV.W - v; return PAD + CV.H - v;
 }
 function handlePos(s, id) {
   const VW = CV.W + 2 * PAD, VH = CV.H + 2 * PAD, k = id[1], f = id[0] === 'o' ? 0.3 : 0.7, p = linePos(s, id);
   return k === 'L' || k === 'R' ? [p, VH * f] : [VW * f, p];
 }
 const LINES = ['oL', 'iL', 'oR', 'iR', 'oT', 'iT', 'oB', 'iB'];
+const isVert = id => id[1] === 'L' || id[1] === 'R';
 function setLine(s, id, pos) {
   const k = id[1], inner = id[0] === 'i';
   let v = k === 'L' || k === 'T' ? pos - PAD : (k === 'R' ? PAD + CV.W - pos : PAD + CV.H - pos);
@@ -1433,7 +1528,6 @@ function setLine(s, id, pos) {
   else v = Math.max(-PAD + 2, Math.min(s.b[k] - 3, v));
   if (inner) s.b[k] = v; else s.o[k] = v;
 }
-// Commit a moved card edge: rebuild the outline from the outer lines and re-straighten, keeping the inner lines where they are.
 function applyOuter(s) {
   const o = s.o; if (!o || (!o.L && !o.R && !o.T && !o.B)) return;
   const Hm = canonToPhoto(s), x0 = o.L, y0 = o.T, x1 = CV.W - o.R, y1 = CV.H - o.B, sx = CV.W / (x1 - x0), sy = CV.H / (y1 - y0);
@@ -1447,65 +1541,131 @@ function isAuto(s) {
 }
 function openReview(stage) {
   const s = cur();
-  show('review'); rv.sel = null;
+  show('review'); rv.sel = 'iL'; rv.corner = 0; rv.cuPos = 0.5;
   rv.outline = stage ? stage === 'outline' : !state.editing && !state.demo;
   rv.firstOutline = rv.outline; rv.olQuad = s.quad.map(p => p.slice());
   setOutlineUi();
-  $('#rv-next').textContent = state.editing ? 'Update grades' : state.step === 'front' ? 'Next: photograph the back' : 'See grades';
-  drawReview();
 }
 function setOutlineUi() {
   const name = state.step === 'front' ? 'front' : 'back';
   $('#rv-title').textContent = rv.outline ? `Check the ${name} outline` : `Check the ${name} borders`;
-  $('#rv-stage').textContent = rv.outline ? 'Step 1 of 2 · card outline' : 'Step 2 of 2 · border lines';
+  $('#rv-stage').textContent = rv.outline ? 'Step 1 of 2 · card outline' : 'Step 2 of 2 · edge and border lines';
   $('#ol-retake').hidden = !rv.firstOutline || state.demo; $('#ol-cancel').hidden = rv.firstOutline;
   $('#ol-bar').hidden = !rv.outline; $('#rv-next').hidden = rv.outline;
   ['#rv-retake', '#rv-outline', '#rv-reset'].forEach(s => $(s).hidden = rv.outline || (s === '#rv-retake' && state.demo));
-  $('#rv-help').textContent = rv.outline ? 'Drag each corner so the green lines run exactly along the card\'s four straight edges. Corners are rounded, so the handle sits just outside the card where the edges would meet. The loupe shows the detail.' : 'Each side has two lines: green on the card\'s cut edge, blue dashed on the inner edge of the printed border. Drag a handle, or tap a line and nudge it.';
-  $('#readout').hidden = $('#ratios').hidden = $('#nudge').hidden = $('#line-legend').hidden = rv.outline;
+  $('#ol-tools').hidden = !rv.outline; $('#bd-tools').hidden = rv.outline;
+  $('#rv-help').textContent = rv.outline
+    ? 'Each white dot marks a corner. Card corners are rounded, so the dot goes where the two straight edges would meet, just outside the curve. Make the thin green lines run exactly along the card\'s edges. Drag a dot, or pick a corner below and use the arrows.'
+    : 'Green: the card\'s cut edge. Blue dashed: the inner edge of the printed border. Pick a side, then drag a line in the close-up or use the arrows.';
+  drawReview();
 }
 function drawReview() {
-  const s = cur(), c = $('#rv'), x = c.getContext('2d');
+  const s = cur();
   const auto = isAuto(s);
   $('#rv-auto').className = 'pill ' + (auto ? 'ok' : 'warn'); $('#rv-auto').textContent = auto ? 'Auto-detected' : 'Adjusted by you';
   $('#rv-notes').innerHTML = s.warnings.map(([k, m]) => `<li class="${k}">${esc(m)}</li>`).join('');
-  if (rv.outline) {
-    const ph = s.photo, sc = Math.min(1, 1100 / Math.max(ph.width, ph.height)); rv.olScale = sc;
-    c.width = Math.round(ph.width * sc); c.height = Math.round(ph.height * sc);
-    x.drawImage(ph, 0, 0, c.width, c.height);
-    const q = rv.olQuad.map(p => [p[0] * sc, p[1] * sc]);
-    x.save(); x.fillStyle = 'rgba(10,12,16,.35)'; x.beginPath(); x.rect(0, 0, c.width, c.height); q.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill('evenodd'); x.restore();
-    for (let i = 0; i < 4; i++) {
-      const a = q[i], b = q[(i + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1];
-      x.strokeStyle = 'rgba(61,220,132,.55)'; x.lineWidth = 1.5; x.setLineDash([6, 5]); x.beginPath(); x.moveTo(a[0] - dx * 0.12, a[1] - dy * 0.12); x.lineTo(b[0] + dx * 0.12, b[1] + dy * 0.12); x.stroke();
-      x.setLineDash([]); x.strokeStyle = '#3DDC84'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
-    }
-    const hr = Math.max(12, c.width / 28);
-    q.forEach(p => { x.fillStyle = 'rgba(31,63,209,.35)'; x.strokeStyle = '#fff'; x.lineWidth = 2.5; x.beginPath(); x.arc(p[0], p[1], hr, 0, 7); x.fill(); x.stroke(); x.beginPath(); x.moveTo(p[0] - 5, p[1]); x.lineTo(p[0] + 5, p[1]); x.moveTo(p[0], p[1] - 5); x.lineTo(p[0], p[1] + 5); x.stroke(); });
-    return;
+  if (rv.outline) { drawOutline(s); drawTiles(s); return; }
+  drawBorders(s); drawCloseup(s); renderReadout(s); renderSideUi();
+}
+
+/* step 1: outline */
+function drawOutline(s) {
+  const c = $('#rv'), x = c.getContext('2d'), ph = s.photo, sc = Math.min(1, 1100 / Math.max(ph.width, ph.height)); rv.olScale = sc;
+  if (c.width !== Math.round(ph.width * sc) || c.height !== Math.round(ph.height * sc)) { c.width = Math.round(ph.width * sc); c.height = Math.round(ph.height * sc); }
+  x.drawImage(ph, 0, 0, c.width, c.height);
+  const k = cssK(c), q = rv.olQuad.map(p => [p[0] * sc, p[1] * sc]);
+  x.save(); x.fillStyle = 'rgba(10,12,16,.35)'; x.beginPath(); x.rect(0, 0, c.width, c.height); q.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill('evenodd'); x.restore();
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1];
+    x.strokeStyle = '#3DDC84'; x.lineWidth = 1.2 * k; x.beginPath(); x.moveTo(a[0] - dx * 0.06, a[1] - dy * 0.06); x.lineTo(b[0] + dx * 0.06, b[1] + dy * 0.06); x.stroke();
   }
+  q.forEach((p, i) => {
+    const n1 = q[(i + 1) % 4], n2 = q[(i + 3) % 4], u = (a) => { const dx = a[0] - p[0], dy = a[1] - p[1], L = Math.hypot(dx, dy); return [dx / L, dy / L]; };
+    const u1 = u(n1), u2 = u(n2), arm = 22 * k, sel = rv.corner === i, col = sel ? '#F2C531' : '#FFFFFF';
+    x.lineCap = 'round'; x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = 5 * k;
+    x.beginPath(); x.moveTo(p[0] + u1[0] * arm, p[1] + u1[1] * arm); x.lineTo(p[0], p[1]); x.lineTo(p[0] + u2[0] * arm, p[1] + u2[1] * arm); x.stroke();
+    x.strokeStyle = col; x.lineWidth = 2.5 * k; x.stroke();
+    x.fillStyle = col; x.strokeStyle = 'rgba(0,0,0,.7)'; x.lineWidth = 1.5 * k; x.beginPath(); x.arc(p[0], p[1], 4 * k, 0, 7); x.fill(); x.stroke();
+  });
+}
+function cornerView(s, i) {
+  const q = rv.olQuad, p = q[i], st = CV.quadStats(q), ppm = st.pxPerMm;
+  const u = a => { const dx = a[0] - p[0], dy = a[1] - p[1], L = Math.hypot(dx, dy); return [dx / L, dy / L]; };
+  const u1 = u(q[(i + 1) % 4]), u2 = u(q[(i + 3) % 4]), r = Math.max(14, 3.2 * ppm);
+  const cx = p[0] + (u1[0] + u2[0]) * 1.4 * ppm, cy = p[1] + (u1[1] + u2[1]) * 1.4 * ppm;
+  return { x0: cx - r, y0: cy - r, r, u1, u2, p };
+}
+function drawTiles(s) {
+  TILE_ORDER.forEach(i => {
+    const c = $('#ct-' + i), x = c.getContext('2d'), v = cornerView(s, i), z = c.width / (2 * v.r);
+    x.imageSmoothingEnabled = true; x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
+    x.drawImage(s.photo, v.x0, v.y0, 2 * v.r, 2 * v.r, 0, 0, c.width, c.height);
+    const P = [(v.p[0] - v.x0) * z, (v.p[1] - v.y0) * z], L = c.width * 1.5;
+    x.strokeStyle = '#3DDC84'; x.lineWidth = 1.5;
+    x.beginPath(); x.moveTo(P[0] - v.u1[0] * 20, P[1] - v.u1[1] * 20); x.lineTo(P[0] + v.u1[0] * L, P[1] + v.u1[1] * L);
+    x.moveTo(P[0] - v.u2[0] * 20, P[1] - v.u2[1] * 20); x.lineTo(P[0] + v.u2[0] * L, P[1] + v.u2[1] * L); x.stroke();
+    x.fillStyle = rv.corner === i ? '#F2C531' : '#fff'; x.strokeStyle = '#000'; x.lineWidth = 1.5; x.beginPath(); x.arc(P[0], P[1], 5, 0, 7); x.fill(); x.stroke();
+    $('#ctb-' + i).classList.toggle('on', rv.corner === i);
+  });
+  const ppm = CV.quadStats(rv.olQuad).pxPerMm;
+  $('#dp-name').textContent = `${CORNER_NAME[rv.corner]} corner · each tap moves ${(1 / ppm).toFixed(2)} mm`;
+}
+function nudgeCorner(dx, dy) { const p = rv.olQuad[rv.corner]; p[0] += dx; p[1] += dy; drawReview(); }
+
+/* step 2: borders */
+function drawBorders(s) {
+  const c = $('#rv'), x = c.getContext('2d');
   ensureView(s);
-  putImg(c, s.view);
-  const VW = c.width, VH = c.height;
+  if (c.width !== s.view.width || c.height !== s.view.height) { c.width = s.view.width; c.height = s.view.height; }
+  x.drawImage(s.viewCanvas, 0, 0);
+  const VW = c.width, VH = c.height, k = cssK(c);
   for (const id of LINES) {
-    const p = linePos(s, id), inner = id[0] === 'i', vert = id[1] === 'L' || id[1] === 'R', sel = rv.sel === id;
-    const seg = () => { x.beginPath(); if (vert) { x.moveTo(p, 0); x.lineTo(p, VH); } else { x.moveTo(0, p); x.lineTo(VW, p); } };
+    const p = linePos(s, id), inner = id[0] === 'i', vert = isVert(id), sel = rv.sel === id, sideSel = rv.sel && rv.sel[1] === id[1];
     x.save();
-    if (sel) { x.lineWidth = 9; x.strokeStyle = 'rgba(255,255,255,.85)'; x.setLineDash([]); seg(); x.stroke(); }
-    x.lineWidth = sel ? 4 : 3; x.strokeStyle = inner ? '#1F3FD1' : '#12A150'; x.setLineDash(inner ? [14, 8] : []); seg(); x.stroke();
-    const [hx, hy] = handlePos(s, id);
-    x.setLineDash([]); x.fillStyle = inner ? '#1F3FD1' : '#12A150'; x.strokeStyle = '#fff'; x.lineWidth = 3;
-    x.beginPath(); if (inner) x.arc(hx, hy, 18, 0, 7); else x.rect(hx - 15, hy - 15, 30, 30); x.fill(); x.stroke();
+    x.lineWidth = (sel ? 2 : 1.1) * k; x.strokeStyle = inner ? '#2F55FF' : '#19C163'; x.setLineDash(inner ? [5 * k, 4 * k] : []);
+    x.beginPath(); if (vert) { x.moveTo(p, 0); x.lineTo(p, VH); } else { x.moveTo(0, p); x.lineTo(VW, p); } x.stroke();
+    const [hx, hy] = handlePos(s, id); x.setLineDash([]);
+    x.fillStyle = inner ? '#2F55FF' : '#19C163'; x.strokeStyle = '#fff'; x.lineWidth = 1.5 * k;
+    x.beginPath(); if (inner) x.arc(hx, hy, (sel ? 7 : 5.5) * k, 0, 7); else { const h = (sel ? 6.5 : 5) * k; x.rect(hx - h, hy - h, 2 * h, 2 * h); } x.fill(); x.stroke();
     x.restore();
   }
-  renderReadout(s);
-  const n = $('#nudge-name');
-  n.textContent = rv.sel ? `${rv.sel[0] === 'o' ? 'Card edge' : 'Border edge'} · ${SIDE_NAME[rv.sel[1]]}` : 'Tap a line to fine-tune it';
-  $('#nudge-minus').disabled = $('#nudge-plus').disabled = !rv.sel;
-  const vert = rv.sel && (rv.sel[1] === 'L' || rv.sel[1] === 'R');
+  // show where the close-up is looking
+  if (rv.cu) { x.save(); x.strokeStyle = '#F2C531'; x.lineWidth = 1.5 * k; x.setLineDash([3 * k, 3 * k]); x.strokeRect(rv.cu.sx, rv.cu.sy, rv.cu.rw, rv.cu.rh); x.restore(); }
+}
+function cuRegion(s) {
+  if (rv.cuFreeze) return rv.cuFreeze;
+  const id = rv.sel || 'iL', k = id[1], vert = isVert(id), po = linePos(s, 'o' + k), pi = linePos(s, 'i' + k), mid = (po + pi) / 2;
+  const VW = CV.W + 2 * PAD, VH = CV.H + 2 * PAD;
+  let rw, rh, cx, cy;
+  if (vert) { rw = Math.max(110, Math.abs(po - pi) + 50); rh = rw * 0.6; cx = mid; cy = PAD + CV.H * rv.cuPos; }
+  else { rh = Math.max(66, Math.abs(po - pi) + 34); rw = rh / 0.6; cy = mid; cx = PAD + CV.W * rv.cuPos; }
+  cx = Math.max(rw / 2, Math.min(VW - rw / 2, cx)); cy = Math.max(rh / 2, Math.min(VH - rh / 2, cy));
+  return { sx: cx - rw / 2, sy: cy - rh / 2, rw, rh, z: 600 / rw, side: k, vert };
+}
+function drawCloseup(s) {
+  const c = $('#cu'), x = c.getContext('2d'), R = cuRegion(s); rv.cu = R;
+  x.imageSmoothingEnabled = true; x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(s.viewCanvas, R.sx, R.sy, R.rw, R.rh, 0, 0, c.width, c.height);
+  const k = cssK(c);
+  for (const t of ['o', 'i']) {
+    const id = t + R.side, p = (linePos(s, id) - (R.vert ? R.sx : R.sy)) * R.z, sel = rv.sel === id;
+    x.save(); x.lineWidth = (sel ? 1.8 : 1.1) * k; x.strokeStyle = t === 'i' ? '#2F55FF' : '#19C163'; x.setLineDash(t === 'i' ? [6 * k, 4 * k] : []);
+    x.beginPath(); if (R.vert) { x.moveTo(p, 0); x.lineTo(p, c.height); } else { x.moveTo(0, p); x.lineTo(c.width, p); } x.stroke();
+    x.setLineDash([]); x.font = `600 ${11 * k}px ${getComputedStyle(document.body).fontFamily}`; x.fillStyle = t === 'i' ? '#2F55FF' : '#19C163';
+    const label = t === 'i' ? 'border' : 'edge', tw = x.measureText(label).width + 8 * k;
+    const lx = R.vert ? p + 4 * k : 6 * k, ly = R.vert ? 6 * k : p + 4 * k;
+    x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(lx, ly, tw, 16 * k); x.fillStyle = t === 'i' ? '#2F55FF' : '#0E8A45'; x.fillText(label, lx + 4 * k, ly + 12 * k);
+    x.restore();
+  }
+}
+function renderSideUi() {
+  const k = (rv.sel || 'iL')[1], vert = k === 'L' || k === 'R';
+  document.querySelectorAll('#cu-sides button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  const names = vert ? ['Top', 'Middle', 'Bottom'] : ['Left', 'Middle', 'Right'];
+  document.querySelectorAll('#cu-pos button').forEach((b, i) => { b.textContent = names[i]; b.classList.toggle('on', Math.abs([0.15, 0.5, 0.85][i] - rv.cuPos) < 0.01); });
+  $('#nudge-name').textContent = rv.sel ? `${rv.sel[0] === 'o' ? 'Card edge' : 'Border edge'} · ${SIDE_NAME[k]}` : 'Tap a line';
   $('#nudge-minus').textContent = vert ? '◀ 0.05 mm' : '▲ 0.05 mm'; $('#nudge-plus').textContent = vert ? '0.05 mm ▶' : '0.05 mm ▼';
 }
-// Which way is it off? Name the wider border and where the artwork sits.
 function direction(a, b, wideA, wideB, artA, artB) {
   const d = Math.abs(a - b) / (a + b) * 100;
   if (d < 1) return 'even';
@@ -1525,36 +1685,30 @@ function renderReadout(s) {
   const worse = c.lrWorst >= c.tbWorst ? 'left/right' : 'top/bottom';
   $('#ratios').innerHTML = `<div class="ratio"><span class="lbl">Left / right</span><span class="val">${c.lr[0].toFixed(1)}/${c.lr[1].toFixed(1)}</span><span class="dir">${lrDir}</span>${bar(c.lrWorst)}</div><div class="ratio"><span class="lbl">Top / bottom</span><span class="val">${c.tb[0].toFixed(1)}/${c.tb[1].toFixed(1)}</span><span class="dir">${tbDir}</span>${bar(c.tbWorst)}</div><p class="small muted" style="grid-column:1/-1">The ${worse} split is the worse one, so it sets the centering grade.</p>`;
 }
-function evPos(e) { const c = $('#rv'), r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height, c.width / r.width]; }
+function evPos(e, c) { c = c || $('#rv'); const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height, c.width / r.width]; }
 function drawLoupe(px, py, clientX) {
   const s = cur(), L = $('#loupe'), lx = L.getContext('2d'), wrap = $('#rvwrap').getBoundingClientRect();
   L.style.display = 'block'; L.style.left = (clientX - wrap.left < wrap.width / 2 ? wrap.width - 136 : 8) + 'px';
-  lx.imageSmoothingEnabled = false; lx.fillStyle = '#111'; lx.fillRect(0, 0, 256, 256);
-  if (rv.outline) {
-    const cx = px / rv.olScale, cy = py / rv.olScale, r = Math.max(18, Math.max(s.photo.width, s.photo.height) * 0.018), z = 256 / (2 * r);
-    lx.imageSmoothingEnabled = true; lx.drawImage(s.photo, cx - r, cy - r, 2 * r, 2 * r, 0, 0, 256, 256);
-    const q = rv.olQuad.map(p => [(p[0] - cx + r) * z, (p[1] - cy + r) * z]);
-    lx.strokeStyle = '#3DDC84'; lx.lineWidth = 2; lx.beginPath();
-    for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1]; lx.moveTo(a[0] - dx * 0.2, a[1] - dy * 0.2); lx.lineTo(b[0] + dx * 0.2, b[1] + dy * 0.2); }
-    lx.stroke(); return;
-  }
-  else { const r = 32; lx.drawImage($('#rv'), px - r, py - r, 2 * r, 2 * r, 0, 0, 256, 256); }
-  lx.strokeStyle = '#fff'; lx.lineWidth = 1; lx.beginPath(); lx.moveTo(128, 100); lx.lineTo(128, 156); lx.moveTo(100, 128); lx.lineTo(156, 128); lx.stroke();
+  lx.imageSmoothingEnabled = true; lx.fillStyle = '#111'; lx.fillRect(0, 0, 256, 256);
+  const cx = px / rv.olScale, cy = py / rv.olScale, r = Math.max(14, CV.quadStats(rv.olQuad).pxPerMm * 2.2), z = 256 / (2 * r);
+  lx.drawImage(s.photo, cx - r, cy - r, 2 * r, 2 * r, 0, 0, 256, 256);
+  const q = rv.olQuad.map(p => [(p[0] - cx + r) * z, (p[1] - cy + r) * z]);
+  lx.strokeStyle = '#3DDC84'; lx.lineWidth = 1.5; lx.beginPath();
+  for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1]; lx.moveTo(a[0] - dx * 0.2, a[1] - dy * 0.2); lx.lineTo(b[0] + dx * 0.2, b[1] + dy * 0.2); }
+  lx.stroke();
 }
 function pickLine(s, px, py, k) {
-  // Handles first (they are staggered so the two lines on a side never share a grab point), then the nearest line.
   let best = null, bd = 1e9;
   for (const id of LINES) { const [hx, hy] = handlePos(s, id), d = Math.hypot(hx - px, hy - py); if (d < bd) { bd = d; best = id; } }
-  if (bd < 28 * k) return best;
+  if (bd < 24 * k) return best;
   best = null; bd = 1e9;
-  for (const id of LINES) { const p = linePos(s, id), d = Math.abs((id[1] === 'L' || id[1] === 'R' ? px : py) - p); if (d < bd) { bd = d; best = id; } }
-  return bd < 14 * k ? best : null;
+  for (const id of LINES) { const p = linePos(s, id), d = Math.abs((isVert(id) ? px : py) - p); if (d < bd) { bd = d; best = id; } }
+  return bd < 12 * k ? best : null;
 }
+function commitLine(s, id) { if (id[0] === 'o') applyOuter(s); else analyze(s); }
 function nudge(dir) {
   const s = cur(), id = rv.sel; if (!id) return;
-  setLine(s, id, linePos(s, id) + dir * 0.5);
-  if (id[0] === 'o') applyOuter(s); else analyze(s);
-  drawReview();
+  setLine(s, id, linePos(s, id) + dir * 0.5); commitLine(s, id); drawReview();
 }
 function bindReview() {
   const c = $('#rv');
@@ -1563,61 +1717,82 @@ function bindReview() {
     if (rv.outline) {
       const sc = rv.olScale; let best = -1, bd = 1e9;
       rv.olQuad.forEach((p, i) => { const d = Math.hypot(p[0] * sc - px, p[1] * sc - py); if (d < bd) { bd = d; best = i; } });
-      if (bd < 60 * k) { const cp = rv.olQuad[best]; rv.drag = { corner: best, ox: px - cp[0] * sc, oy: py - cp[1] * sc }; c.setPointerCapture(e.pointerId); drawLoupe(cp[0] * sc, cp[1] * sc, e.clientX); }
+      if (bd < 44 * k) { const cp = rv.olQuad[best]; rv.corner = best; rv.drag = { corner: best, ox: px - cp[0] * sc, oy: py - cp[1] * sc }; c.setPointerCapture(e.pointerId); drawLoupe(cp[0] * sc, cp[1] * sc, e.clientX); drawReview(); }
       return;
     }
     const id = pickLine(s, px, py, k);
-    rv.sel = id; drawReview();
-    if (id) {
-      const p = linePos(s, id), vert = id[1] === 'L' || id[1] === 'R';
-      rv.drag = { line: id, off: (vert ? px : py) - p, moved: false };
-      c.setPointerCapture(e.pointerId); drawLoupe(vert ? p : px, vert ? py : p, e.clientX);
-    }
+    if (!id) return;
+    rv.sel = id; const p = linePos(s, id), vert = isVert(id);
+    rv.drag = { line: id, off: (vert ? px : py) - p, moved: false }; c.setPointerCapture(e.pointerId); drawReview();
   });
   c.addEventListener('pointermove', e => {
     if (!rv.drag) return; const [px, py] = evPos(e), s = cur();
-    if (rv.drag.corner != null) { const nx = px - rv.drag.ox, ny = py - rv.drag.oy; rv.olQuad[rv.drag.corner] = [nx / rv.olScale, ny / rv.olScale]; rv.olMoved = true; drawReview(); drawLoupe(nx, ny, e.clientX); return; }
-    const id = rv.drag.line, vert = id[1] === 'L' || id[1] === 'R';
-    setLine(s, id, (vert ? px : py) - rv.drag.off); rv.drag.moved = true;
-    drawReview(); const p = linePos(s, id); drawLoupe(vert ? p : px, vert ? py : p, e.clientX);
+    if (rv.drag.corner != null) { const nx = px - rv.drag.ox, ny = py - rv.drag.oy; rv.olQuad[rv.drag.corner] = [nx / rv.olScale, ny / rv.olScale]; drawReview(); drawLoupe(nx, ny, e.clientX); return; }
+    const id = rv.drag.line; setLine(s, id, (isVert(id) ? px : py) - rv.drag.off); rv.drag.moved = true; drawReview();
   });
   const end = () => {
     if (!rv.drag) return; const d = rv.drag; rv.drag = null; $('#loupe').style.display = 'none';
-    if (d.line && d.moved) { const s = cur(); if (d.line[0] === 'o') applyOuter(s); else analyze(s); drawReview(); }
+    if (d.line && d.moved) { commitLine(cur(), d.line); drawReview(); }
   };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  // close-up: drag either line of the selected side at high zoom
+  const cu = $('#cu');
+  cu.addEventListener('pointerdown', e => {
+    const s = cur(), R = rv.cu; if (!s || !R) return;
+    const [px, py] = evPos(e, cu), vx = R.sx + px / R.z, vy = R.sy + py / R.z, a = R.vert ? vx : vy;
+    const ids = ['o' + R.side, 'i' + R.side], id = ids.sort((m, n) => Math.abs(linePos(s, m) - a) - Math.abs(linePos(s, n) - a))[0];
+    rv.sel = id; rv.cuFreeze = R; rv.drag = { cu: true, line: id, off: a - linePos(s, id), moved: false }; cu.setPointerCapture(e.pointerId); drawReview();
+  });
+  cu.addEventListener('pointermove', e => {
+    if (!rv.drag || !rv.drag.cu) return; const s = cur(), R = rv.cuFreeze, [px, py] = evPos(e, cu);
+    const a = R.vert ? R.sx + px / R.z : R.sy + py / R.z; setLine(s, rv.drag.line, a - rv.drag.off); rv.drag.moved = true; drawReview();
+  });
+  const cuEnd = () => { if (!rv.drag || !rv.drag.cu) return; const d = rv.drag; rv.drag = null; rv.cuFreeze = null; if (d.moved) commitLine(cur(), d.line); drawReview(); };
+  cu.addEventListener('pointerup', cuEnd); cu.addEventListener('pointercancel', cuEnd);
+  document.querySelectorAll('#cu-sides button').forEach(b => b.onclick = () => { rv.sel = (rv.sel ? rv.sel[0] : 'i') + b.dataset.k; drawReview(); });
+  document.querySelectorAll('#cu-pos button').forEach((b, i) => b.onclick = () => { rv.cuPos = [0.15, 0.5, 0.85][i]; drawReview(); });
+  TILE_ORDER.forEach(i => $('#ctb-' + i).onclick = () => { rv.corner = i; drawReview(); });
+  $('#dp-l').onclick = () => nudgeCorner(-1, 0); $('#dp-r').onclick = () => nudgeCorner(1, 0);
+  $('#dp-u').onclick = () => nudgeCorner(0, -1); $('#dp-d').onclick = () => nudgeCorner(0, 1);
   $('#nudge-minus').onclick = () => nudge(-1);
   $('#nudge-plus').onclick = () => nudge(1);
   $('#rv-reset').onclick = () => {
     const s = cur(); s.quad = s.quadAuto.map(p => p.slice()); s.b = Object.assign({}, s.bAuto);
-    s.canon = CV.toCanonical(s.img, s.quad); s.view = null; analyze(s); rv.sel = null; drawReview();
+    s.canon = CV.toCanonical(s.img, s.quad); s.view = null; analyze(s); drawReview();
   };
-  $('#rv-outline').onclick = () => { rv.outline = true; rv.firstOutline = false; rv.olQuad = cur().quad.map(p => p.slice()); setOutlineUi(); drawReview(); };
-  $('#ol-cancel').onclick = () => { rv.outline = false; setOutlineUi(); drawReview(); };
+  $('#rv-outline').onclick = () => { rv.outline = true; rv.firstOutline = false; rv.olQuad = cur().quad.map(p => p.slice()); setOutlineUi(); };
+  $('#ol-cancel').onclick = () => { rv.outline = false; setOutlineUi(); };
   $('#ol-retake').onclick = () => openCapture(state.step);
   $('#ol-apply').onclick = async () => {
     const s = cur(), nq = CV.orderPortrait(rv.olQuad.map(p => p.slice()));
     const changed = nq.some((p, i) => Math.hypot(p[0] - s.quad[i][0], p[1] - s.quad[i][1]) > 0.5);
     if (changed) {
       busy('Re-measuring…'); await nextFrame();
-      // Snap the hand-placed outline onto the nearest real edges, then measure from it.
-      const snap = CV.detectCard(s.img, { rough: nq, band: Math.max(6, Math.max(s.img.width, s.img.height) * 0.006), near: true });
-      const ok = snap.quad && snap.quad.every((p, i) => Math.hypot(p[0] - nq[i][0], p[1] - nq[i][1]) < Math.max(8, s.stats.pxPerMm * 0.8));
+      // You placed the corners: snap only a hair (≤0.3 mm) onto the nearest real edge, so your placement wins.
+      const ppm = CV.quadStats(nq).pxPerMm;
+      const snap = CV.detectCard(s.img, { rough: nq, band: Math.max(3, ppm * 0.3), near: true });
+      const ok = snap.quad && snap.quad.every((p, i) => Math.hypot(p[0] - nq[i][0], p[1] - nq[i][1]) < Math.max(3, ppm * 0.35));
       s.quad = ok ? snap.quad : nq; s.auto = true;
       s.det = Object.assign({}, s.det, { ok: true, conf: 1, quad: s.quad, edgeWidthMm: ok ? snap.edgeWidthMm : s.det.edgeWidthMm });
       measure(s, true); busy('');
     }
-    rv.outline = false; rv.firstOutline = false; setOutlineUi(); drawReview();
+    rv.outline = false; rv.firstOutline = false; setOutlineUi();
   };
   $('#rv-retake').onclick = () => openCapture(state.step);
   $('#rv-next').onclick = () => {
     if (state.editing || state.step === 'back') { state.editing = false; openResults(); }
     else openCapture('back');
   };
+  window.addEventListener('resize', () => { if (!$('#review').hidden) drawReview(); });
 }
 
 /* ---------- results ---------- */
-function measurementsOf(s) { return { cent: { worst: s.cent.worst }, cornerFr: s.cond.corners.map(c => c.frac), edgeFr: s.cond.edges.map(e => e.frac), surfFr: s.cond.surface.frac }; }
+function dismissed(s, key) { return !!(s.dismiss && s.dismiss[key]); }
+function measurementsOf(s) {
+  let a = 0, n = 0;
+  s.cond.surface.sides.forEach((v, i) => { if (v.skipped) return; n += v.n; if (!dismissed(s, 's' + i)) a += v.a; });
+  return { cent: { worst: s.cent.worst }, cornerFr: s.cond.corners.map((c, i) => dismissed(s, 'c' + i) ? 0 : c.frac), edgeFr: s.cond.edges.map((e, i) => dismissed(s, 'e' + i) ? 0 : e.frac), surfFr: n ? a / n : 0 };
+}
 function compute() {
   const F = state.sides.front, B = state.sides.back;
   return GRADE.estimate({ front: measurementsOf(F), back: B ? measurementsOf(B) : null, flags: state.flags, ai: state.aiPoints, useAi: state.useAi });
@@ -1638,7 +1813,7 @@ function openResults() {
   $('#edit-back').hidden = !state.sides.back;
   $('#save').textContent = state.demo ? 'Example only' : state.savedId ? 'Update saved card' : 'Save to my cards';
   $('#save').disabled = state.demo;
-  renderFlags(); renderResults(); renderZooms(); renderAiPanel();
+  renderFlags(); renderResults(); renderDefects(); renderAiPanel();
 }
 function renderResults() {
   const est = compute(); state.est = est;
@@ -1658,30 +1833,68 @@ function renderResults() {
     <tr><td>Surface</td><td class="mono small">${fmt(sub(PF.surface))}</td><td class="mono small">${PB ? fmt(sub(PB.surface)) : '—'}</td><td class="grade">${fmt(est.subs.surface)}</td></tr>
   </tbody>`;
 }
+const SIDE_TO_EDGE = [3, 1, 0, 2];
 function maskedCanvas(s, x0, y0, w, h, outW) {
   const c = canvasOf(outW, Math.round(outW * h / w)), x = c.getContext('2d'), src = canvasOf(CV.W, CV.H);
   putImg(src, s.canon);
-  x.imageSmoothingEnabled = outW < w; x.drawImage(src, x0, y0, w, h, 0, 0, c.width, c.height);
+  x.imageSmoothingEnabled = true; x.drawImage(src, x0, y0, w, h, 0, 0, c.width, c.height);
   if ($('#show-mask').checked) {
-    const m = s.cond.mask, ov = canvasOf(w, h), ox = ov.getContext('2d'), id = ox.createImageData(w, h);
+    const m = s.cond.mask, G = CV.geo(), ov = canvasOf(w, h), ox = ov.getContext('2d'), id = ox.createImageData(w, h);
     const cols = { 1: [224, 36, 154], 2: [16, 181, 214], 3: [242, 169, 0] };
-    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const v = m[(y0 + yy) * CV.W + x0 + xx]; if (v) { const p = (yy * w + xx) * 4, cc = cols[v]; id.data[p] = cc[0]; id.data[p + 1] = cc[1]; id.data[p + 2] = cc[2]; id.data[p + 3] = 230; } }
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      const gi = (y0 + yy) * CV.W + x0 + xx, v = m[gi]; if (!v) continue;
+      const key = v === 1 ? (G.cr[gi] >= 0 ? 'c' + G.cr[gi] : 'e' + SIDE_TO_EDGE[G.sd[gi]]) : v === 2 ? 's' + G.sd[gi] : null;
+      if (key && dismissed(s, key)) continue;
+      const p = (yy * w + xx) * 4, cc = cols[v]; id.data[p] = cc[0]; id.data[p + 1] = cc[1]; id.data[p + 2] = cc[2]; id.data[p + 3] = 230;
+    }
     ox.putImageData(id, 0, 0); x.drawImage(ov, 0, 0, c.width, c.height);
   }
   return c;
 }
-function renderZooms() {
-  const cards = $('#cards'), zooms = $('#zooms'); cards.innerHTML = ''; zooms.innerHTML = '';
+const ZONE_NAME = { c: ['top-left corner', 'top-right corner', 'bottom-right corner', 'bottom-left corner'], e: ['top edge', 'right edge', 'bottom edge', 'left edge'], s: ['left border', 'right border', 'top border', 'bottom border'] };
+const CAT = { c: 'corners', e: 'edges', s: 'surface' };
+function defectsOf(s) {
+  const out = [];
+  s.cond.corners.forEach((c, i) => { if (c.frac >= 0.004) out.push({ kind: 'c', i, frac: c.frac, what: 'Whitening' }); });
+  s.cond.edges.forEach((e, i) => { if (e.frac >= 0.002) out.push({ kind: 'e', i, frac: e.frac, what: 'Whitening' }); });
+  s.cond.surface.sides.forEach((v, i) => { if (!v.skipped && v.n && v.a / v.n >= 0.004) out.push({ kind: 's', i, frac: v.a / v.n, what: 'Spots or scratches' }); });
+  return out;
+}
+function defectCrop(s, d) {
+  const z = d.kind === 'c' ? 80 : 60;
+  if (d.kind === 'c') return [[0, 0], [CV.W - z, 0], [CV.W - z, CV.H - z], [0, CV.H - z]][d.i].concat([z]);
+  const cc = CV.zoneCenter(s.cond, d.kind, d.i) || [CV.W / 2, CV.H / 2];
+  return [Math.max(0, Math.min(CV.W - z, Math.round(cc[0] - z / 2))), Math.max(0, Math.min(CV.H - z, Math.round(cc[1] - z / 2))), z];
+}
+function renderDefects() {
+  const cards = $('#cards'), list = $('#defects'); cards.innerHTML = ''; list.innerHTML = '';
+  const base = compute(); let count = 0;
   for (const k of ['front', 'back']) {
     const s = state.sides[k]; if (!s) continue;
     const fig = document.createElement('figure'), cv = maskedCanvas(s, 0, 0, CV.W, CV.H, 420);
     const cap = document.createElement('figcaption'); cap.innerHTML = `<span>${k === 'front' ? 'Front' : 'Back'}</span><span class="mono">${s.cent.lr[0].toFixed(0)}/${s.cent.lr[1].toFixed(0)} · ${s.cent.tb[0].toFixed(0)}/${s.cent.tb[1].toFixed(0)}</span>`;
     fig.append(cv, cap); cards.append(fig);
-    const z = 70, grid = document.createElement('div'); grid.className = 'zooms'; grid.style.marginTop = '8px';
-    const names = ['TL', 'TR', 'BR', 'BL'], pos = [[0, 0], [CV.W - z, 0], [CV.W - z, CV.H - z], [0, CV.H - z]];
-    names.forEach((n, i) => { const f = document.createElement('figure'), c = maskedCanvas(s, pos[i][0], pos[i][1], z, z, 210), cp = document.createElement('figcaption'); cp.textContent = `${k === 'front' ? 'F' : 'B'} ${n} · ${(s.cond.corners[i].frac * 100).toFixed(1)}%`; f.append(c, cp); grid.append(f); });
-    zooms.append(grid);
+    const skipped = s.cond.surface.sides.map((v, i) => v.skipped ? ['left', 'right', 'top', 'bottom'][i] : null).filter(Boolean);
+    if (skipped.length) { const p = document.createElement('p'); p.className = 'small muted'; p.textContent = `${k === 'front' ? 'Front' : 'Back'}: the ${skipped.join(', ')} border${skipped.length > 1 ? 's have' : ' has'} artwork or holo pattern in it, so spots there weren't scored. Check those by eye.`; list.append(p); }
+    for (const d of defectsOf(s)) {
+      count++;
+      const key = d.kind + d.i, off = dismissed(s, key), cat = CAT[d.kind];
+      s.dismiss = s.dismiss || {}; s.dismiss[key] = !off; const alt = compute(); s.dismiss[key] = off;
+      const now = base.subs[cat], other = alt.subs[cat], psaNow = base.results[0].grade, psaAlt = alt.results[0].grade;
+      const impact = off
+        ? `Not counted. If it is there, ${cat} drops to ${GRADE.fmt(other)}${psaAlt !== psaNow ? ` and PSA to ${psaAlt}` : ''}.`
+        : (other !== now ? `Counted: ${cat} ${GRADE.fmt(now)}. If it's not there: ${GRADE.fmt(other)}${psaAlt !== psaNow ? `, PSA ${psaAlt}` : ''}.` : `Counted, but too small to change the ${cat} grade on its own.`);
+      const [x0, y0, z] = defectCrop(s, d), row = document.createElement('div');
+      row.className = 'defect' + (off ? ' off' : '');
+      const thumb = maskedCanvas(s, x0, y0, z, z, 220); thumb.className = 'dthumb';
+      row.innerHTML = `<div class="dinfo"><b>${k === 'front' ? 'Front' : 'Back'} · ${ZONE_NAME[d.kind][d.i]}</b><span class="small muted">${d.what} on ${(d.frac * 100).toFixed(1)}% of that area</span><span class="small">${esc(impact)}</span><div class="seg small"><button type="button" class="${off ? '' : 'on'}" data-v="1">I see it</button><button type="button" class="${off ? 'on' : ''}" data-v="0">Not there</button></div></div>`;
+      row.prepend(thumb);
+      row.querySelectorAll('button').forEach(b => b.onclick = () => { s.dismiss = s.dismiss || {}; s.dismiss[key] = b.dataset.v === '0'; renderResults(); renderDefects(); });
+      list.append(row);
+    }
   }
+  if (!count) { const p = document.createElement('p'); p.className = 'small'; p.textContent = 'Nothing flagged on the corners, edges or plain borders. Still check under a lamp in hand.'; list.prepend(p); }
+  $('#defect-count').textContent = count ? `${count} flagged` : '';
 }
 const FLAGS = [['crease', 'Crease or bend'], ['dent', 'Dent or indent'], ['scratch', 'Scratches on holo'], ['printline', 'Print lines'], ['stain', 'Stain or mark']];
 function renderFlags() {
@@ -1814,7 +2027,7 @@ $('#f-cam').onchange = e => { const f = e.target.files[0]; e.target.value = ''; 
 $('#f-pick').onchange = e => { const f = e.target.files[0]; e.target.value = ''; onFile(f); };
 $('#shoot').onclick = () => captureLive();
 $('#skip-back').onclick = () => { state.sides.back = null; openResults(); };
-$('#show-mask').onchange = renderZooms;
+$('#show-mask').onchange = renderDefects;
 $('#save').onclick = saveCurrent;
 $('#edit-front').onclick = () => { state.editing = true; state.step = 'front'; openReview(); };
 $('#edit-back').onclick = () => { state.editing = true; state.step = 'back'; openReview(); };
