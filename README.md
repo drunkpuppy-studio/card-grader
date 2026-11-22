@@ -2,7 +2,7 @@
 
 Pokémon card pre-grader that runs in your phone's browser.
 
-**Open it:** https://zonghongt.github.io/pregrade
+**Open it:** https://drunkpuppy-studio.github.io/card-grader
 
 - Live camera guide: finds the card, checks light, glare, framing, angle, focus and steadiness, then captures automatically.
 - Two-step check: confirm the card outline, then the edge and border lines (two per side).

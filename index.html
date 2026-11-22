@@ -1646,7 +1646,7 @@ function pcRowFor(co, grade, label) {
 const pcToken = () => { try { return localStorage.getItem('pregrade.pc') || ''; } catch (e) { return ''; } };
 const money = (v, cur) => v == null || isNaN(v) ? '—' : (cur === 'EUR' ? '€' : 'US$') + Number(v).toFixed(2);
 const fmtDate = d => { const t = new Date(d); return isNaN(t) ? '' : t.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); };
-const NET_MSG = 'Couldn\'t reach the price service. Check your connection. Inside the Claude app, prices can\'t load: open zonghongt.github.io/pregrade instead.';
+const NET_MSG = 'Couldn\'t reach the price service. Check your connection. Inside the Claude app, prices can\'t load: open drunkpuppy-studio.github.io/card-grader instead.';
 async function fetchJson(url) { const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
 async function searchCards(name, num) {
   let list = await fetchJson('https://api.tcgdex.net/v2/en/cards?name=' + encodeURIComponent(name));
