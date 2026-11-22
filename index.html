@@ -374,6 +374,7 @@ tr.mine td { background: #FFF5D1; }
         <canvas class="loupe" id="loupe" width="256" height="256"></canvas>
       </div>
       <p class="small muted" id="rv-help"></p>
+      <label class="switch small" id="enh-wrap"><input type="checkbox" id="enh" checked> Enhance close-ups (sharper, more contrast; edges stay put)</label>
       <div id="ol-tools" class="tools">
         <div class="ctiles">
           <button class="ctile" id="ctb-0" type="button"><canvas id="ct-0" width="240" height="240"></canvas><span>Top-left</span></button>
@@ -386,7 +387,7 @@ tr.mine td { background: #FFF5D1; }
         </div>
       </div>
       <div id="bd-tools" class="tools">
-        <div class="legend" id="line-legend"><span style="--c:#19C163">Card edge (outer)</span><span style="--c:#2F55FF">Print border edge (inner)</span><span style="--c:#F2C531">Close-up area</span></div>
+        <div class="legend" id="line-legend"><span style="--c:#19C163">Card edge (outer)</span><span style="--c:#2F55FF">Print border edge (inner)</span><span style="--c:#F2C531">Close-up area</span><span style="--c:#BDBDBD">White ▼ markers: sharpest colour change</span></div>
         <div class="seg" id="cu-sides"><button type="button" data-k="L">Left</button><button type="button" data-k="R">Right</button><button type="button" data-k="T">Top</button><button type="button" data-k="B">Bottom</button></div>
         <canvas id="cu" width="600" height="360"></canvas>
         <div class="row" style="justify-content:space-between;gap:8px">
@@ -2072,7 +2073,7 @@ function ensureView(s) {
   const Hm = canonToPhoto(s), VW = CV.W + 2 * PAD, VH = CV.H + 2 * PAD;
   const q = [[-PAD, -PAD], [CV.W + PAD, -PAD], [CV.W + PAD, CV.H + PAD], [-PAD, CV.H + PAD]].map(p => CV.applyH(Hm, p[0], p[1]));
   s.view = CV.warp(s.img, q, VW, VH);
-  s.viewCanvas = canvasOf(VW, VH); putImg(s.viewCanvas, s.view);
+  s.viewCanvas = canvasOf(VW, VH); putImg(s.viewCanvas, s.view); s.viewCanvasE = null; s.cuCache = null;
   s.o = { L: 0, R: 0, T: 0, B: 0 };
 }
 function widths(s) { const o = s.o || { L: 0, R: 0, T: 0, B: 0 }; return { L: s.b.L - o.L, R: s.b.R - o.R, T: s.b.T - o.T, B: s.b.B - o.B }; }
@@ -2135,6 +2136,78 @@ function drawReview() {
   drawBorders(s); drawCloseup(s); renderReadout(s); renderSideUi();
 }
 
+/* ---- Enhance: sharper, higher-contrast close-ups that never move an edge ----
+   Only two kinds of operation are used, and neither can shift where an edge sits:
+   1. a symmetric unsharp mask (zero-phase blur, so an edge's midpoint stays at the same pixel), and
+   2. a per-pixel contrast stretch (monotonic, so it changes brightness, never position).
+   Crops are always taken on whole pixels and drawn back at the exact same coordinates. */
+let ENH = true; try { ENH = localStorage.getItem('pregrade.enhance') !== '0'; } catch (e) {}
+function enhanceData(im, amount) {
+  const w = im.width, h = im.height, d = im.data, N = w * h, Y = new Float32Array(N), T = new Float32Array(N), B = new Float32Array(N);
+  for (let i = 0, p = 0; i < N; i++, p += 4) Y[i] = 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
+  const K = [1, 4, 6, 4, 1];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let a = 0; for (let k = -2; k <= 2; k++) a += K[k + 2] * Y[y * w + Math.min(w - 1, Math.max(0, x + k))]; T[y * w + x] = a / 16; }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let a = 0; for (let k = -2; k <= 2; k++) a += K[k + 2] * T[Math.min(h - 1, Math.max(0, y + k)) * w + x]; B[y * w + x] = a / 16; }
+  const hist = new Uint32Array(256); for (let i = 0; i < N; i++) hist[Math.max(0, Math.min(255, Y[i] | 0))]++;
+  const pct = q => { let acc = 0; const t = q * N; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= t) return v; } return 255; };
+  let lo = pct(0.01), hi = pct(0.99); if (hi - lo < 40) { const m = (hi + lo) / 2; lo = m - 20; hi = m + 20; }
+  const gain = Math.min(2.6, 225 / (hi - lo)), A = amount == null ? 1.1 : amount;
+  for (let i = 0, p = 0; i < N; i++, p += 4) {
+    const det = A * (Y[i] - B[i]);
+    for (let c = 0; c < 3; c++) d[p + c] = (d[p + c] + det - lo) * gain + 15;
+  }
+  return im;
+}
+// Draw src[sx..sx+sw, sy..sy+sh] into dst canvas area (dx,dy,dw,dh), enhanced when ENH is on.
+function drawRegion(x, src, sx, sy, sw, sh, dx, dy, dw, dh) {
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  if (!ENH) { x.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh); return; }
+  const W = src.width, H = src.height, m = 3;
+  const ix = Math.max(0, Math.floor(sx) - m), iy = Math.max(0, Math.floor(sy) - m);
+  const ix2 = Math.min(W, Math.ceil(sx + sw) + m), iy2 = Math.min(H, Math.ceil(sy + sh) + m), iw = ix2 - ix, ih = iy2 - iy;
+  if (iw < 2 || ih < 2) { x.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh); return; }
+  const t = canvasOf(iw, ih), tx = t.getContext('2d', { willReadFrequently: true });
+  tx.drawImage(src, ix, iy, iw, ih, 0, 0, iw, ih);
+  tx.putImageData(enhanceData(tx.getImageData(0, 0, iw, ih)), 0, 0);
+  x.drawImage(t, sx - ix, sy - iy, sw, sh, dx, dy, dw, dh);
+}
+function viewSource(s) {
+  if (!ENH) return s.viewCanvas;
+  if (!s.viewCanvasE) { const c = canvasOf(s.viewCanvas.width, s.viewCanvas.height), cx = c.getContext('2d', { willReadFrequently: true }); cx.drawImage(s.viewCanvas, 0, 0); cx.putImageData(enhanceData(cx.getImageData(0, 0, c.width, c.height), 0.8), 0, 0); s.viewCanvasE = c; }
+  return s.viewCanvasE;
+}
+// Close-up pixels re-sampled straight from the original photo at its full resolution (the border view is only 10 px/mm).
+function closeupImage(s, R) {
+  const ppm = CV.quadStats(s.quad).pxPerMm, f = Math.max(1, Math.min(3, ppm / CV.MM));
+  const ow = Math.max(8, Math.round(R.rw * f)), oh = Math.max(8, Math.round(R.rh * f));
+  const key = [state.step, R.sx, R.sy, R.rw, R.rh, ENH, s.quad.join()].join('|');
+  if (s.cuCache && s.cuCache.key === key) return s.cuCache;
+  const Hm = canonToPhoto(s), q = [[R.sx, R.sy], [R.sx + R.rw, R.sy], [R.sx + R.rw, R.sy + R.rh], [R.sx, R.sy + R.rh]].map(p => CV.applyH(Hm, p[0] - PAD, p[1] - PAD));
+  const raw = CV.warp(s.img, q, ow, oh), c = canvasOf(ow, oh);
+  const disp = ENH ? enhanceData(new ImageData(new Uint8ClampedArray(raw.data), ow, oh)) : new ImageData(new Uint8ClampedArray(raw.data), ow, oh);
+  c.getContext('2d').putImageData(disp, 0, 0);
+  s.cuCache = { key, canvas: c, hints: edgeHints(raw, R.vert), ow, oh };
+  return s.cuCache;
+}
+// Where the colour changes fastest across the close-up: candidate positions for a line (0..1 across the image).
+function edgeHints(im, vert) {
+  const w = im.width, h = im.height, d = im.data, n = vert ? w : h, m = vert ? h : w, prof = new Float32Array(n * 3);
+  const a0 = Math.floor(m * 0.15), a1 = Math.ceil(m * 0.85);
+  for (let i = 0; i < n; i++) { let r = 0, g = 0, b = 0; for (let j = a0; j < a1; j++) { const p = (vert ? j * w + i : i * w + j) * 4; r += d[p]; g += d[p + 1]; b += d[p + 2]; } const k = a1 - a0; prof[i * 3] = r / k; prof[i * 3 + 1] = g / k; prof[i * 3 + 2] = b / k; }
+  const gr = new Float32Array(n);
+  for (let i = 1; i < n - 1; i++) gr[i] = Math.hypot(prof[i * 3 + 3] - prof[i * 3 - 3], prof[i * 3 + 4] - prof[i * 3 - 2], prof[i * 3 + 5] - prof[i * 3 - 1]);
+  let mx = 0; for (let i = 0; i < n; i++) mx = Math.max(mx, gr[i]);
+  const out = [], rad = Math.max(2, Math.round(n * 0.04));
+  for (let i = 2; i < n - 2; i++) {
+    if (gr[i] < mx * 0.35 || gr[i] < 4) continue;
+    let peak = true; for (let k = -rad; k <= rad; k++) if (k && i + k >= 0 && i + k < n && gr[i + k] > gr[i]) { peak = false; break; }
+    if (!peak) continue;
+    const l = gr[i - 1], r = gr[i + 1], den = l - 2 * gr[i] + r, off = den < 0 ? 0.5 * (l - r) / den : 0;
+    out.push({ t: (i + 0.5 + Math.max(-0.5, Math.min(0.5, off))) / n, s: gr[i] / mx });
+  }
+  return out.sort((a, b) => b.s - a.s).slice(0, 3);
+}
+
 /* step 1: outline */
 function drawOutline(s) {
   const c = $('#rv'), x = c.getContext('2d'), ph = s.photo, sc = Math.min(1, 1100 / Math.max(ph.width, ph.height)); rv.olScale = sc;
@@ -2165,8 +2238,8 @@ function cornerView(s, i) {
 function drawTiles(s) {
   TILE_ORDER.forEach(i => {
     const c = $('#ct-' + i), x = c.getContext('2d'), v = cornerView(s, i), z = c.width / (2 * v.r);
-    x.imageSmoothingEnabled = true; x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
-    x.drawImage(s.photo, v.x0, v.y0, 2 * v.r, 2 * v.r, 0, 0, c.width, c.height);
+    x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
+    drawRegion(x, s.photo, v.x0, v.y0, 2 * v.r, 2 * v.r, 0, 0, c.width, c.height);
     const P = [(v.p[0] - v.x0) * z, (v.p[1] - v.y0) * z], L = c.width * 1.5;
     x.strokeStyle = '#3DDC84'; x.lineWidth = 1.5;
     x.beginPath(); x.moveTo(P[0] - v.u1[0] * 20, P[1] - v.u1[1] * 20); x.lineTo(P[0] + v.u1[0] * L, P[1] + v.u1[1] * L);
@@ -2184,7 +2257,7 @@ function drawBorders(s) {
   const c = $('#rv'), x = c.getContext('2d');
   ensureView(s);
   if (c.width !== s.view.width || c.height !== s.view.height) { c.width = s.view.width; c.height = s.view.height; }
-  x.drawImage(s.viewCanvas, 0, 0);
+  x.drawImage(viewSource(s), 0, 0);
   const VW = c.width, VH = c.height, k = cssK(c);
   for (const id of LINES) {
     const p = linePos(s, id), inner = id[0] === 'i', vert = isVert(id), sel = rv.sel === id, sideSel = rv.sel && rv.sel[1] === id[1];
@@ -2211,9 +2284,17 @@ function cuRegion(s) {
 }
 function drawCloseup(s) {
   const c = $('#cu'), x = c.getContext('2d'), R = cuRegion(s); rv.cu = R;
-  x.imageSmoothingEnabled = true; x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
-  x.drawImage(s.viewCanvas, R.sx, R.sy, R.rw, R.rh, 0, 0, c.width, c.height);
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
+  const C = closeupImage(s, R); x.drawImage(C.canvas, 0, 0, C.ow, C.oh, 0, 0, c.width, c.height);
   const k = cssK(c);
+  // small white markers where the colour changes fastest: the likely spots for a line
+  x.save(); x.fillStyle = 'rgba(255,255,255,.95)'; x.strokeStyle = 'rgba(0,0,0,.6)'; x.lineWidth = 1 * k;
+  for (const hnt of C.hints) {
+    const a = 6 * k; x.globalAlpha = 0.55 + 0.45 * hnt.s;
+    if (R.vert) { const p = hnt.t * c.width; x.beginPath(); x.moveTo(p - a, 0); x.lineTo(p + a, 0); x.lineTo(p, a * 1.4); x.closePath(); x.fill(); x.stroke(); x.beginPath(); x.moveTo(p - a, c.height); x.lineTo(p + a, c.height); x.lineTo(p, c.height - a * 1.4); x.closePath(); x.fill(); x.stroke(); }
+    else { const p = hnt.t * c.height; x.beginPath(); x.moveTo(0, p - a); x.lineTo(0, p + a); x.lineTo(a * 1.4, p); x.closePath(); x.fill(); x.stroke(); x.beginPath(); x.moveTo(c.width, p - a); x.lineTo(c.width, p + a); x.lineTo(c.width - a * 1.4, p); x.closePath(); x.fill(); x.stroke(); }
+  }
+  x.restore();
   for (const t of ['o', 'i']) {
     const id = t + R.side, p = (linePos(s, id) - (R.vert ? R.sx : R.sy)) * R.z, sel = rv.sel === id;
     x.save(); x.lineWidth = (sel ? 1.8 : 1.1) * k; x.strokeStyle = t === 'i' ? '#2F55FF' : '#19C163'; x.setLineDash(t === 'i' ? [6 * k, 4 * k] : []);
@@ -2258,7 +2339,7 @@ function drawLoupe(px, py, clientX) {
   L.style.display = 'block'; L.style.left = (clientX - wrap.left < wrap.width / 2 ? wrap.width - 136 : 8) + 'px';
   lx.imageSmoothingEnabled = true; lx.fillStyle = '#111'; lx.fillRect(0, 0, 256, 256);
   const cx = px / rv.olScale, cy = py / rv.olScale, r = Math.max(14, CV.quadStats(rv.olQuad).pxPerMm * 2.2), z = 256 / (2 * r);
-  lx.drawImage(s.photo, cx - r, cy - r, 2 * r, 2 * r, 0, 0, 256, 256);
+  drawRegion(lx, s.photo, cx - r, cy - r, 2 * r, 2 * r, 0, 0, 256, 256);
   const q = rv.olQuad.map(p => [(p[0] - cx + r) * z, (p[1] - cy + r) * z]);
   lx.strokeStyle = '#3DDC84'; lx.lineWidth = 1.5; lx.beginPath();
   for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1]; lx.moveTo(a[0] - dx * 0.2, a[1] - dy * 0.2); lx.lineTo(b[0] + dx * 0.2, b[1] + dy * 0.2); }
@@ -2318,6 +2399,8 @@ function bindReview() {
   cu.addEventListener('pointerup', cuEnd); cu.addEventListener('pointercancel', cuEnd);
   document.querySelectorAll('#cu-sides button').forEach(b => b.onclick = () => { rv.sel = (rv.sel ? rv.sel[0] : 'i') + b.dataset.k; drawReview(); });
   document.querySelectorAll('#cu-pos button').forEach((b, i) => b.onclick = () => { rv.cuPos = [0.15, 0.5, 0.85][i]; drawReview(); });
+  $('#enh').checked = ENH;
+  $('#enh').onchange = e => { ENH = e.target.checked; try { localStorage.setItem('pregrade.enhance', ENH ? '1' : '0'); } catch (er) {} for (const k of ['front', 'back']) { const sd = state.sides[k]; if (sd) sd.cuCache = null; } drawReview(); };
   TILE_ORDER.forEach(i => $('#ctb-' + i).onclick = () => { rv.corner = i; drawReview(); });
   $('#dp-l').onclick = () => nudgeCorner(-1, 0); $('#dp-r').onclick = () => nudgeCorner(1, 0);
   $('#dp-u').onclick = () => nudgeCorner(0, -1); $('#dp-d').onclick = () => nudgeCorner(0, 1);
