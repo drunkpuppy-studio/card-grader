@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PreGrade">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#F2F3EF">
 <title>PreGrade Card Grader</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -171,48 +177,142 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
 .legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
 .busy { position: fixed; inset: 0; background: rgba(242,243,239,.8); display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; z-index: 10; }
 [hidden] { display: none !important; }
+/* ---------- app shell: top bar, tab bar, safe areas ---------- */
+:root { --nav-h: 50px; --tab-h: 58px; }
+html { -webkit-text-size-adjust: 100%; }
+body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+.nav { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: calc(var(--nav-h) + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); background: rgba(242,243,239,.9); -webkit-backdrop-filter: saturate(1.5) blur(16px); backdrop-filter: saturate(1.5) blur(16px); border-bottom: 1px solid var(--line); }
+.nav-back { grid-column: 1; justify-self: start; display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 16px; padding: 8px 6px; min-height: 44px; cursor: pointer; }
+.nav-back svg { width: 11px; height: 19px; }
+.nav-title { grid-column: 2; font-family: var(--display); font-weight: 700; font-size: 17px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 58vw; }
+.nav-right { grid-column: 3; justify-self: end; }
+.progress { position: absolute; left: 0; right: 0; bottom: -1px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; height: 3px; padding: 0 10px; }
+.progress i { background: var(--line); border-radius: 2px; }
+.progress i.done { background: var(--accent); } .progress i.on { background: var(--accent); opacity: .5; }
+.app { max-width: 560px; margin: 0 auto; padding: 14px max(16px, env(safe-area-inset-right)) calc(var(--tab-h) + 30px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: block; }
+body.flow .app { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+.view { display: flex; flex-direction: column; gap: 16px; }
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: 1fr 1fr 1fr; height: calc(var(--tab-h) + env(safe-area-inset-bottom)); padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: rgba(255,255,255,.92); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-top: 1px solid var(--line); }
+.tabs button { border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #7A818E; font-size: 11px; font-weight: 600; cursor: pointer; min-height: 44px; }
+.tabs svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+.tabs button.on { color: var(--accent); }
+.tab-grade .tg-dot { width: 50px; height: 50px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-top: -22px; box-shadow: 0 6px 16px rgba(31,63,209,.35), 0 0 0 4px var(--paper); }
+.tab-grade .tg-dot svg { stroke: #fff; }
+body.flow .tabs { display: none; }
+.savebar { position: sticky; bottom: calc(var(--tab-h) + 12px + env(safe-area-inset-bottom)); z-index: 5; }
+body.flow .savebar { bottom: calc(12px + env(safe-area-inset-bottom)); }
+.savebar .btn { box-shadow: 0 8px 22px rgba(31,63,209,.28); min-height: 50px; font-size: 16px; }
+.btn.danger { color: var(--bad); border-color: #EDC0BC; }
+.center { text-align: center; }
+.toast { position: fixed; left: 50%; bottom: calc(var(--tab-h) + 84px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 50; }
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+.sheet-bg { position: fixed; inset: 0; background: rgba(10,12,16,.42); z-index: 40; display: flex; align-items: flex-end; justify-content: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.sheet { background: #fff; border-radius: 18px; padding: 20px; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 16px; font-size: 16px; }
+.sheet-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* binder */
+.bhead h1 { font-size: 32px; }
+.btools { display: flex; gap: 8px; }
+.search, .select { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: #fff; min-height: 42px; color: var(--ink); font-size: 16px; }
+.search { flex: 1; min-width: 0; }
+.pages { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 16px; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.pages::-webkit-scrollbar { display: none; }
+.page { flex: 0 0 100%; scroll-snap-align: center; display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; padding: 11px; border-radius: 16px; background: linear-gradient(#E4E6DF, #DCDFD6); border: 1px solid #CFD2C9; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 8px rgba(0,0,0,.06); }
+.pocket { aspect-ratio: 63/88; border-radius: 7px; background: rgba(255,255,255,.45); border: 1px dashed #BFC3B9; position: relative; overflow: hidden; padding: 0; cursor: default; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); }
+.pocket.filled { border: 1px solid rgba(0,0,0,.1); background: #1A1D22; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,.18); }
+.pocket.filled::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,.32), rgba(255,255,255,0) 38%); pointer-events: none; }
+.pocket img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pocket .pchip { position: absolute; left: 4px; bottom: 4px; font: 600 10.5px var(--mono); background: rgba(20,23,29,.85); color: #fff; padding: 1px 5px; border-radius: 4px; }
+.pocket .pval { position: absolute; right: 4px; top: 4px; font: 600 10px var(--mono); background: rgba(255,255,255,.92); color: var(--ink); padding: 1px 4px; border-radius: 4px; }
+.pocket .pname { position: absolute; left: 0; right: 0; bottom: 22px; font-size: 10px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.pocket.add { cursor: pointer; border-color: var(--accent); color: var(--accent); background: rgba(255,255,255,.75); gap: 2px; }
+.pocket.add span { font-size: 28px; line-height: 1; } .pocket.add small { font-size: 11px; font-weight: 600; }
+.dots { display: flex; justify-content: center; gap: 6px; margin-top: -6px; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: #C3C7BD; } .dots i.on { background: var(--ink); }
+/* card header on results */
+.cardhead { display: grid; grid-template-columns: 116px 1fr; gap: 14px; align-items: start; }
+.ch-img { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.ch-img canvas { width: 116px; height: auto; border-radius: 7px; background: #1A1D22; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+.ch-img .seg button { flex: 1; padding: 6px 4px; min-height: 32px; font-size: 12px; }
+.ch-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.titleinput { font-family: var(--display); font-weight: 800; font-size: 22px; border: 0; border-bottom: 1px dashed var(--line); background: transparent; padding: 4px 0; width: 100%; color: var(--ink); border-radius: 0; }
+.titleinput:disabled { border-bottom-color: transparent; }
+.ch-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+/* prices */
+.refrow { display: grid; grid-template-columns: 56px 1fr; gap: 12px; align-items: center; }
+.refrow img { width: 56px; border-radius: 4px; }
+.pick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.pick { border: 1px solid var(--line); border-radius: 8px; padding: 4px; background: #fff; display: flex; flex-direction: column; gap: 3px; font-size: 11px; cursor: pointer; text-align: left; color: var(--ink); }
+.pick img { width: 100%; aspect-ratio: 63/88; object-fit: cover; border-radius: 4px; background: #EEE; }
+tr.mine td { background: #FFF5D1; }
+#price-panel h3 { margin-top: 4px; }
+
 </style>
 </head>
 <body>
-<div class="app">
-  <header class="top">
-    <button class="brand" id="go-home" type="button" aria-label="PreGrade home"><b>PreGrade</b><span>Card pre-grader</span></button>
-    <div class="steps" id="steps" hidden><i data-s="front">Front</i><i data-s="back">Back</i><i data-s="results">Grades</i></div>
-  </header>
+<header class="nav" id="nav">
+  <button class="nav-back" id="nav-back" type="button" hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="nav-back-label">Back</span></button>
+  <div class="nav-title" id="nav-title">Binder</div>
+  <div class="nav-right" id="nav-right"></div>
+  <div class="progress" id="progress" hidden><i data-s="front"></i><i data-s="back"></i><i data-s="results"></i></div>
+</header>
+<div class="app" id="main">
 
-  <!-- HOME -->
-  <section id="home" class="app" style="padding:0">
-    <div class="panel">
+  <!-- BINDER -->
+  <section id="binder" class="view">
+    <div class="bhead">
+      <div><h1>Binder</h1><p class="small muted" id="b-stats"></p></div>
+    </div>
+    <div class="btools" id="b-tools">
+      <input id="b-search" class="search" type="search" placeholder="Search cards" aria-label="Search cards">
+      <select id="b-sort" class="select" aria-label="Sort cards">
+        <option value="new">Newest</option><option value="grade">Best grade</option><option value="value">Value</option><option value="name">Name</option>
+      </select>
+    </div>
+    <div class="pages" id="b-pages"></div>
+    <div class="dots" id="b-dots"></div>
+    <div class="panel" id="b-empty">
       <div class="hero">
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <h1>Will it slab a 10?</h1>
-          <p class="muted">Photograph the front and back of a Pokémon card. PreGrade measures centering to a tenth of a millimetre, checks corners, edges and surface, and estimates the grade at PSA, BGS, CGC, SGC and TAG.</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h2>Will it slab a 10?</h2>
+          <p class="muted small">Photograph a card's front and back. PreGrade measures centering to a tenth of a millimetre, checks corners, edges and surface, and estimates PSA, BGS, CGC, SGC and TAG grades.</p>
         </div>
         <div class="slab" aria-hidden="true"></div>
       </div>
-      <button class="btn primary block" id="start" type="button">Grade a card</button>
       <div class="how">
         <div><b>01</b>Card on a dark, plain surface, out of its sleeve, under even light.</div>
-        <div><b>02</b>Line it up in the guide. The app checks focus, glare and angle.</div>
-        <div><b>03</b>Check the border lines, nudge them if needed, and read the grades.</div>
+        <div><b>02</b>Line it up in the guide; it captures by itself.</div>
+        <div><b>03</b>Check the lines, confirm any flagged wear, save it to your binder.</div>
       </div>
+      <button class="btn primary block" id="start" type="button">Grade your first card</button>
+      <button class="btn block" id="open-demo" type="button">See an example result</button>
     </div>
+  </section>
 
+  <!-- SETTINGS -->
+  <section id="prefs" class="view" hidden>
     <div class="panel">
-      <div class="row" style="justify-content:space-between"><h2>Your cards</h2><span class="small muted" id="hist-count"></span></div>
-      <div class="hist" id="hist"></div>
+      <h2>Prices</h2>
+      <p class="small muted">Raw (ungraded) prices come free from TCGdex: TCGplayer in US$ and Cardmarket in €. Prices by grade need a PriceCharting API key (a paid PriceCharting plan). The key stays on this phone.</p>
+      <div class="field"><label for="pc-token">PriceCharting API key</label><input id="pc-token" autocomplete="off" spellcheck="false" placeholder="Paste your key"></div>
+      <div class="row"><button class="btn" id="pc-save" type="button">Save key</button><span class="small muted" id="pc-status"></span></div>
     </div>
-
+    <div class="panel">
+      <h2>Your data</h2>
+      <p class="small muted" id="data-status">Cards, photos and lines are kept on this phone only.</p>
+      <button class="btn" id="wipe" type="button">Delete all saved cards</button>
+    </div>
     <div class="panel">
       <details>
         <summary>Where the grade numbers come from</summary>
         <ul id="sources"></ul>
       </details>
     </div>
+    <p class="small muted center">PreGrade · estimates from photos, not a grading service. Not affiliated with any grading company or card publisher.</p>
   </section>
 
   <!-- CAPTURE -->
-  <section id="capture" class="app" style="padding:0" hidden>
+  <section id="capture" class="view" hidden>
     <div class="row" style="justify-content:space-between">
       <h2 id="cap-title">Photograph the front</h2>
       <button class="btn ghost" id="skip-back" type="button" hidden>Skip back</button>
@@ -258,7 +358,7 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
   </section>
 
   <!-- REVIEW -->
-  <section id="review" class="app" style="padding:0" hidden>
+  <section id="review" class="view" hidden>
     <div class="row" style="justify-content:space-between">
       <h2 id="rv-title">Check the front borders</h2>
       <span class="pill" id="rv-auto">Auto-detected</span>
@@ -310,7 +410,15 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
   </section>
 
   <!-- RESULTS -->
-  <section id="results" class="app" style="padding:0" hidden>
+  <section id="results" class="view" hidden>
+    <div class="cardhead">
+      <div class="ch-img"><canvas id="ch-canvas" width="240" height="335"></canvas><div class="seg small" id="ch-side"><button type="button" data-s="front" class="on">Front</button><button type="button" data-s="back">Back</button></div></div>
+      <div class="ch-info">
+        <input id="cardname" class="titleinput" placeholder="Name this card" aria-label="Card name">
+        <span class="small muted" id="ch-ref"></span>
+        <div class="ch-chips" id="ch-chips"></div>
+      </div>
+    </div>
     <div class="panel call">
       <span class="tag-ex" id="res-ex" hidden>Example · synthetic demo card</span>
       <div class="big" id="call"></div>
@@ -321,6 +429,11 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
       <h2>Estimated grades</h2>
       <div class="tablewrap"><table id="verdict"></table></div>
       <p class="small muted" id="verdict-note"></p>
+    </div>
+
+    <div class="panel" id="price-panel">
+      <div class="row" style="justify-content:space-between"><h2>Market value</h2><button class="btn ghost small" id="price-refresh" type="button" hidden>Refresh</button></div>
+      <div id="price-body"></div>
     </div>
 
     <div class="panel">
@@ -353,17 +466,22 @@ details ul { margin: 0; padding-left: 18px; display: flex; flex-direction: colum
     </div>
 
     <div class="panel">
-      <div class="field"><label for="cardname">Card name</label><input id="cardname" placeholder="e.g. Charizard ex 199/165"></div>
       <div class="row">
-        <button class="btn primary" id="save" type="button">Save to my cards</button>
-        <button class="btn" id="edit-front" type="button">Adjust front</button>
-        <button class="btn" id="edit-back" type="button">Adjust back</button>
+        <button class="btn" id="edit-front" type="button">Adjust front lines</button>
+        <button class="btn" id="edit-back" type="button">Adjust back lines</button>
       </div>
-      <button class="btn block" id="again" type="button">Grade another card</button>
+      <button class="btn danger block" id="delete-card" type="button" hidden>Delete from binder</button>
     </div>
+    <div class="savebar" id="savebar"><button class="btn primary block" id="save" type="button">Save to binder</button></div>
     <p class="small muted">Estimates from photos, not a grading service. Graders look at the card under magnification and can see things a phone camera can't.</p>
   </section>
 </div>
+<nav class="tabs" id="tabs" aria-label="Main">
+  <button type="button" data-tab="binder" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg><span>Binder</span></button>
+  <button type="button" data-tab="grade" class="tab-grade"><span class="tg-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.3-2h5.2l1.3 2h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.3" r="3.4"/></svg></span><span>Grade</span></button>
+  <button type="button" data-tab="prefs"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5"/></svg><span>Settings</span></button>
+</nav>
+<div class="sheet-bg" id="sheet" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-text"><p id="sheet-text"></p><div class="sheet-btns"><button class="btn" id="sheet-cancel" type="button">Cancel</button><button class="btn primary" id="sheet-ok" type="button">OK</button></div></div></div>
 <div class="busy" id="busy" hidden><span class="spin"></span><span id="busy-msg">Measuring…</span></div>
 
 <script id="cv-src">/* PreGrade computer-vision core. Pure JS, works on {width,height,data:RGBA} images.
@@ -1303,17 +1421,327 @@ const MAXDIM = 2200;
 const state = { step: 'front', sides: { front: null, back: null }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: false, editing: false, savedId: null };
 let sampleApi = null;
 
-/* ---------- views ---------- */
+/* ---------- navigation ---------- */
+const VIEWS = ['binder', 'prefs', 'capture', 'review', 'results'];
+let curView = 'binder';
+function inFlow() { return curView === 'capture' || curView === 'review' || (curView === 'results' && !state.savedId && !state.demo); }
 function show(view) {
-  for (const v of ['home', 'capture', 'review', 'results']) $('#' + v).hidden = v !== view;
-  $('#steps').hidden = view === 'home'; document.querySelector('header.top').classList.toggle('inflow', view !== 'home');
-  const order = ['front', 'back', 'results'], curS = view === 'results' ? 'results' : state.step;
-  document.querySelectorAll('#steps i').forEach(i => { const k = order.indexOf(i.dataset.s), c = order.indexOf(curS); i.className = k === c ? 'on' : k < c ? 'done' : ''; });
+  curView = view;
+  for (const v of VIEWS) $('#' + v).hidden = v !== view;
   if (view !== 'capture') stopCamera();
+  updateNav();
   window.scrollTo(0, 0);
 }
-function busy(msg) { $('#busy-msg').textContent = msg || 'Measuring…'; $('#busy').hidden = !msg; }
+function updateNav() {
+  const v = curView, side = state.step === 'back' ? 'back' : 'front', flow = inFlow();
+  document.body.classList.toggle('flow', flow);
+  const titles = { binder: 'Binder', prefs: 'Settings', capture: `Photograph the ${side}`, review: `${rv.outline ? 'Outline' : 'Borders'} · ${side}`, results: state.savedId ? (state.name || 'Card') : state.demo ? 'Example' : 'Grades' };
+  $('#nav-title').textContent = v === 'binder' ? '' : (titles[v] || 'PreGrade');
+  $('#nav-back').hidden = v === 'binder' || v === 'prefs';
+  $('#nav-back-label').textContent = v === 'results' && (state.savedId || state.demo) ? 'Binder' : v === 'capture' && state.step === 'front' && !state.sides.front ? 'Cancel' : 'Back';
+  const tab = v === 'prefs' ? 'prefs' : flow ? 'grade' : 'binder';
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  const prog = $('#progress'); prog.hidden = !flow;
+  const c = v === 'results' ? 2 : side === 'back' ? 1 : 0;
+  prog.querySelectorAll('i').forEach((i, k) => i.className = k < c ? 'done' : k === c ? 'on' : '');
+}
 const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+function busy(msg) { $('#busy-msg').textContent = msg || 'Measuring…'; $('#busy').hidden = !msg; }
+let sheetResolve = null;
+function ask(text, ok) {
+  $('#sheet-text').textContent = text; $('#sheet-ok').textContent = ok || 'OK'; $('#sheet').hidden = false;
+  return new Promise(r => { sheetResolve = r; });
+}
+function closeSheet(v) { $('#sheet').hidden = true; if (sheetResolve) { const r = sheetResolve; sheetResolve = null; r(v); } }
+let toastT = 0;
+function toast(msg) {
+  let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); }
+  t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200);
+}
+function hasUnsavedFlow() { return !!(state.sides.front && !state.savedId && !state.demo); }
+// One step back, wherever you are. Used by the back button, Android's back button and the iOS back swipe (through history).
+async function goBack() {
+  const v = curView;
+  if (!$('#sheet').hidden) { closeSheet(false); return; }
+  if (v === 'prefs') return showBinder();
+  if (v === 'results') {
+    if (state.savedId || state.demo) {
+      if (state.dirty && state.savedId && !await ask('Leave without saving your changes to this card?', 'Leave')) return;
+      return showBinder();
+    }
+    state.editing = false; state.step = state.sides.back ? 'back' : 'front'; return openReview('borders');
+  }
+  if (v === 'review') {
+    if (state.editing) { state.editing = false; return openResults(); }
+    if (rv.outline) return openCapture(state.step);
+    rv.outline = true; rv.firstOutline = true; rv.olQuad = cur().quad.map(p => p.slice()); return setOutlineUi();
+  }
+  if (v === 'capture') {
+    if (state.sides[state.step]) return openReview('outline');          // was retaking: keep the earlier photo
+    if (state.step === 'back') { state.step = 'front'; return openReview('borders'); }
+    return showBinder();
+  }
+}
+function pushNav() { try { history.pushState({ pg: 1 }, '', '#app'); } catch (e) {} }
+window.addEventListener('popstate', () => { if (curView === 'binder') return; goBack(); pushNav(); });
+
+/* ---------- storage (IndexedDB on this device; memory if unavailable) ---------- */
+const DB = {
+  db: undefined, mem: new Map(),
+  open() {
+    if (this.db !== undefined) return Promise.resolve(this.db);
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open('pregrade', 1);
+        r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('cards')) r.result.createObjectStore('cards', { keyPath: 'id' }); };
+        r.onsuccess = () => { this.db = r.result; res(this.db); };
+        r.onerror = () => { this.db = null; res(null); };
+      } catch (e) { this.db = null; res(null); }
+    });
+  },
+  async tx(mode, fn) {
+    const db = await this.open(); if (!db) return fn(null);
+    return new Promise(res => { try { const t = db.transaction('cards', mode), st = t.objectStore('cards'), out = fn(st); t.oncomplete = () => res(out && 'result' in out ? out.result : true); t.onerror = () => res(null); t.onabort = () => res(null); } catch (e) { res(null); } });
+  },
+  async all() { const db = await this.open(); if (!db) return [...this.mem.values()]; return (await this.tx('readonly', st => st.getAll())) || []; },
+  async get(id) { const db = await this.open(); if (!db) return this.mem.get(id); return this.tx('readonly', st => st.get(id)); },
+  async put(rec) { const db = await this.open(); if (!db) { this.mem.set(rec.id, rec); return true; } return !!(await this.tx('readwrite', st => { st.put(rec); return null; })); },
+  async del(id) { const db = await this.open(); if (!db) { this.mem.delete(id); return true; } return !!(await this.tx('readwrite', st => { st.delete(id); return null; })); },
+  async clear() { const db = await this.open(); if (!db) { this.mem.clear(); return true; } return !!(await this.tx('readwrite', st => { st.clear(); return null; })); }
+};
+// Cards saved by older versions (summary only, no photos) move into the binder once.
+async function migrateLegacy() {
+  let old = []; try { old = JSON.parse(localStorage.getItem('pregrade.history.v1') || '[]'); } catch (e) {}
+  if (!old.length) return;
+  for (const e of old) await DB.put({ id: 'legacy-' + e.id, created: Date.parse(e.date) || Date.now(), updated: Date.parse(e.date) || Date.now(), name: e.name || '', thumb: e.thumb, legacy: true,
+    summary: { psa: +(String((e.grades[0] || [])[1] || '').match(/\d+(\.\d)?/) || [0])[0] || null, grades: e.grades.map(g => [g[0], String(g[1]).replace(/^[A-Za-z\-\/+ ]+(?=\d)/, '')]), cent: e.cent }, sides: null });
+  try { localStorage.removeItem('pregrade.history.v1'); } catch (e) {}
+}
+
+/* ---------- binder ---------- */
+async function showBinder() { show('binder'); await renderBinder(); }
+function recValue(r) { return r.price && r.price.rawUsd ? r.price.rawUsd : 0; }
+async function renderBinder() {
+  const all = await DB.all(), q = $('#b-search').value.trim().toLowerCase(), sort = $('#b-sort').value;
+  let list = all.filter(r => !q || `${r.name || ''} ${r.ref ? r.ref.name + ' ' + (r.ref.setName || '') : ''}`.toLowerCase().includes(q));
+  const by = { new: (a, b) => (b.created || 0) - (a.created || 0), grade: (a, b) => ((b.summary || {}).psa || 0) - ((a.summary || {}).psa || 0), value: (a, b) => recValue(b) - recValue(a), name: (a, b) => (a.name || '~').localeCompare(b.name || '~') };
+  list.sort(by[sort] || by.new);
+  const total = all.reduce((s, r) => s + recValue(r), 0), priced = all.filter(r => recValue(r)).length;
+  $('#b-stats').textContent = all.length ? `${all.length} card${all.length > 1 ? 's' : ''}${priced ? ` · about US$${total < 100 ? total.toFixed(2) : total.toFixed(0)} raw value (${priced} priced)` : ''}` : 'No cards yet';
+  $('#b-empty').hidden = all.length > 0; $('#b-tools').hidden = all.length === 0;
+  const pages = $('#b-pages'), dots = $('#b-dots'); pages.innerHTML = ''; dots.innerHTML = '';
+  if (!all.length) return;
+  const n = Math.max(1, Math.ceil((list.length + 1) / 9));
+  for (let p = 0; p < n; p++) {
+    const page = document.createElement('div'); page.className = 'page';
+    for (let k = 0; k < 9; k++) {
+      const r = list[p * 9 + k], b = document.createElement('button'); b.type = 'button';
+      if (r) {
+        b.className = 'pocket filled'; b.setAttribute('aria-label', r.name || 'Unnamed card');
+        const g = (r.summary && r.summary.grades || []).find(x => x[0] === 'PSA');
+        b.innerHTML = `<img alt="" src="${esc(r.thumb || '')}">${g ? `<span class="pchip">PSA ${esc(g[1])}</span>` : ''}${recValue(r) ? `<span class="pval">$${recValue(r) < 10 ? recValue(r).toFixed(2) : recValue(r).toFixed(0)}</span>` : ''}<span class="pname">${esc(r.name || '')}</span>`;
+        b.onclick = () => openSaved(r.id);
+      } else if (p * 9 + k === list.length && !q) {
+        b.className = 'pocket add'; b.innerHTML = '<span>+</span><small>Grade a card</small>'; b.onclick = startFlow;
+      } else { b.className = 'pocket'; b.tabIndex = -1; b.setAttribute('aria-hidden', 'true'); }
+      page.append(b);
+    }
+    pages.append(page);
+    const d = document.createElement('i'); if (!p) d.className = 'on'; dots.append(d);
+  }
+  dots.hidden = n < 2;
+  pages.onscroll = () => { const i = Math.round(pages.scrollLeft / pages.clientWidth); dots.querySelectorAll('i').forEach((d, j) => d.className = j === i ? 'on' : ''); };
+}
+
+/* ---------- saving and opening cards ---------- */
+function thumb(s) { const c = canvasOf(CV.W, CV.H); putImg(c, s.canon); const t = canvasOf(180, 252); t.getContext('2d').drawImage(c, 0, 0, 180, 252); return t.toDataURL('image/jpeg', 0.8); }
+async function sideRecord(s) {
+  const k = Math.min(1, 1800 / Math.max(s.photo.width, s.photo.height)), c = canvasOf(Math.round(s.photo.width * k), Math.round(s.photo.height * k));
+  c.getContext('2d').drawImage(s.photo, 0, 0, c.width, c.height);
+  const sc = p => [p[0] * k, p[1] * k];
+  return { photo: await toBlob(c, 0.9), quad: s.quad.map(sc), quadAuto: (s.quadAuto || s.quad).map(sc), b: Object.assign({}, s.b), bAuto: Object.assign({}, s.bAuto || s.b), dismiss: Object.assign({}, s.dismiss || {}) };
+}
+async function loadSide(sr) {
+  let src;
+  try { src = await createImageBitmap(sr.photo); }
+  catch (e) { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(sr.photo); }); }
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight, c = canvasOf(w, h), x = c.getContext('2d'); x.drawImage(src, 0, 0);
+  const img = x.getImageData(0, 0, w, h), quad = sr.quad.map(p => p.slice());
+  const s = { img, photo: c, quad, det: { ok: true, conf: 1, quad, edgeWidthMm: null, stats: CV.quadStats(quad) }, auto: true };
+  measure(s, true);
+  s.b = Object.assign({}, sr.b); s.bAuto = Object.assign({}, sr.bAuto); s.quadAuto = sr.quadAuto.map(p => p.slice()); s.dismiss = Object.assign({}, sr.dismiss || {});
+  s.view = null; analyze(s); return s;
+}
+async function saveCard() {
+  const F = state.sides.front; if (!F || state.demo) return;
+  state.name = $('#cardname').value.trim();
+  busy('Saving…'); await nextFrame();
+  let ok = false, rec;
+  try {
+    const est = compute();
+    rec = { id: state.savedId || 'c' + Date.now(), created: state.created || Date.now(), updated: Date.now(), name: state.name, ref: state.ref || null, price: state.price || null,
+      flags: state.flags, ai: state.ai, aiPoints: state.aiPoints, useAi: state.useAi,
+      summary: { psa: est.results[0].grade, best: `${est.best.co} ${est.best.label}`, grades: est.results.map(r => [r.co, r.co === 'TAG' ? String(r.score) : GRADE.fmt(r.grade)]), cent: [F.cent.worst, state.sides.back ? state.sides.back.cent.worst : null] },
+      thumb: thumb(F), sides: { front: await sideRecord(F), back: state.sides.back ? await sideRecord(state.sides.back) : null } };
+    ok = await DB.put(rec);
+  } catch (e) { ok = false; }
+  busy('');
+  if (!ok) { toast('Couldn\'t save on this device'); return; }
+  const first = !state.savedId;
+  state.savedId = rec.id; state.created = rec.created; state.dirty = false;
+  toast(first ? 'Saved to your binder' : 'Changes saved');
+  openResults();
+}
+async function openSaved(id) {
+  busy('Opening…'); await nextFrame();
+  let rec;
+  try { rec = await DB.get(id); } catch (e) { rec = null; }
+  if (!rec) { busy(''); toast('Couldn\'t open that card'); return; }
+  if (!rec.sides || !rec.sides.front) {
+    busy('');
+    if (await ask(`"${rec.name || 'This card'}" was saved by an older version without its photos, so it can't be reopened. Delete it from the binder?`, 'Delete')) { await DB.del(id); renderBinder(); }
+    return;
+  }
+  try {
+    const front = await loadSide(rec.sides.front), back = rec.sides.back ? await loadSide(rec.sides.back) : null;
+    Object.assign(state, { sides: { front, back }, flags: rec.flags || {}, ai: rec.ai || null, aiPoints: rec.aiPoints || null, useAi: !!rec.useAi, demo: false, editing: false,
+      savedId: rec.id, created: rec.created, name: rec.name || '', ref: rec.ref || null, price: rec.price || null, dirty: false, chSide: 'front' });
+  } catch (e) { busy(''); toast('Couldn\'t open that card'); return; }
+  busy(''); openResults();
+}
+async function deleteCard() {
+  if (!state.savedId) return;
+  if (!await ask(`Delete "${state.name || 'this card'}" and its photos from your binder?`, 'Delete')) return;
+  await DB.del(state.savedId); state.savedId = null; state.dirty = false; toast('Deleted'); showBinder();
+}
+function markDirty() { if (state.savedId) { state.dirty = true; $('#save').textContent = 'Save changes'; } }
+
+/* ---------- card header on the results page ---------- */
+function renderCardHead() {
+  const side = state.chSide === 'back' && state.sides.back ? 'back' : 'front', s = state.sides[side], c = $('#ch-canvas');
+  const src = canvasOf(CV.W, CV.H); putImg(src, s.canon); c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  $('#ch-side').hidden = !state.sides.back;
+  document.querySelectorAll('#ch-side button').forEach(b => b.classList.toggle('on', b.dataset.s === side));
+  const r = state.ref;
+  $('#ch-ref').textContent = r ? `${r.name} · ${r.setName || ''} ${r.number || ''}`.trim() : state.demo ? 'Synthetic demo card' : 'Not linked to a card yet (see Market value)';
+  const est = state.est || compute(), psa = est.results[0];
+  $('#ch-chips').innerHTML = `<span class="chip">PSA ${GRADE.fmt(psa.grade)}</span><span class="chip">Best: ${esc(est.best.co)} ${esc(est.best.label)}</span>` + (state.price && state.price.rawUsd ? `<span class="chip">~US$${state.price.rawUsd.toFixed(2)} raw</span>` : '');
+}
+
+/* ---------- prices ---------- */
+// Raw prices: TCGdex (free, no key; TCGplayer USD + Cardmarket EUR, each with its own "updated" date).
+// Prices by grade: PriceCharting API with the user's own key (pennies; fields per grade, see PC_ROWS).
+const PC_ROWS = [
+  ['PSA 10', 'manual-only-price'], ['BGS 10 Black Label', 'condition-20-price'], ['BGS 10', 'bgs-10-price'], ['CGC 10 Pristine', 'condition-19-price'], ['CGC 10', 'condition-17-price'],
+  ['SGC 10', 'condition-18-price'], ['TAG 10', 'condition-21-price'], ['Grade 9.5 (any company)', 'box-only-price'], ['Grade 9 (any company)', 'graded-price'],
+  ['Grade 8–8.5 (any company)', 'new-price'], ['Grade 7–7.5 (any company)', 'cib-price'], ['Ungraded', 'loose-price']];
+function pcRowFor(co, grade, label) {
+  if (co === 'BGS' && /Black/.test(label)) return 'condition-20-price';
+  if (/Pristine/.test(label) && co === 'CGC') return 'condition-19-price';
+  if (grade >= 10) return { PSA: 'manual-only-price', BGS: 'bgs-10-price', CGC: 'condition-17-price', SGC: 'condition-18-price', TAG: 'condition-21-price' }[co];
+  if (grade >= 9.5) return 'box-only-price'; if (grade >= 9) return 'graded-price'; if (grade >= 8) return 'new-price'; if (grade >= 7) return 'cib-price'; return null;
+}
+const pcToken = () => { try { return localStorage.getItem('pregrade.pc') || ''; } catch (e) { return ''; } };
+const money = (v, cur) => v == null || isNaN(v) ? '—' : (cur === 'EUR' ? '€' : 'US$') + Number(v).toFixed(2);
+const fmtDate = d => { const t = new Date(d); return isNaN(t) ? '' : t.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); };
+const NET_MSG = 'Couldn\'t reach the price service. Check your connection. Inside the Claude app, prices can\'t load: open zonghongt.github.io/pregrade instead.';
+async function fetchJson(url) { const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+async function searchCards(name, num) {
+  let list = await fetchJson('https://api.tcgdex.net/v2/en/cards?name=' + encodeURIComponent(name));
+  if (!Array.isArray(list)) list = [];
+  const n = String(num || '').split('/')[0].replace(/^0+/, '');
+  if (n) list = list.filter(c => String(c.localId).replace(/^0+/, '') === n).concat(list.filter(c => String(c.localId).replace(/^0+/, '') !== n));
+  return list.slice(0, 30);
+}
+async function loadPrices() {
+  const r = state.ref; if (!r) return;
+  state.priceLoading = true; renderPrice();
+  const p = { fetchedAt: Date.now() };
+  try {
+    const card = await fetchJson('https://api.tcgdex.net/v2/en/cards/' + encodeURIComponent(r.id)), pr = card.pricing || {};
+    const tp = pr.tcgplayer || {}, cm = pr.cardmarket || {};
+    p.tcgplayer = { updated: tp.updated, variants: Object.keys(tp).filter(k => tp[k] && typeof tp[k] === 'object').map(k => ({ name: k, market: tp[k].marketPrice, low: tp[k].lowPrice, mid: tp[k].midPrice })) };
+    p.cardmarket = cm.updated ? { updated: cm.updated, trend: cm.trend, avg30: cm.avg30, trendHolo: cm['trend-holo'], avg30Holo: cm['avg30-holo'] } : null;
+    const markets = p.tcgplayer.variants.map(v => v.market).filter(v => v > 0);
+    p.rawUsd = markets.length ? Math.max(...markets) : null;
+    if (card.set) { r.setName = card.set.name; r.total = card.set.cardCount && card.set.cardCount.official; }
+  } catch (e) { p.rawError = NET_MSG; }
+  const tok = pcToken();
+  if (tok) {
+    try {
+      const q = `${r.name} ${r.number || ''} ${r.setName || ''}`.trim();
+      const j = await fetchJson(`https://www.pricecharting.com/api/products?t=${encodeURIComponent(tok)}&q=${encodeURIComponent(q)}`);
+      if (j.status === 'error') throw new Error(j['error-message'] || 'PriceCharting refused the request');
+      const prod = (j.products || [])[0];
+      if (prod) {
+        const d = await fetchJson(`https://www.pricecharting.com/api/product?t=${encodeURIComponent(tok)}&id=${encodeURIComponent(prod.id)}`);
+        p.pc = { name: d['product-name'] || prod['product-name'], set: d['console-name'] || prod['console-name'], id: prod.id, prices: Object.fromEntries(PC_ROWS.map(([, k]) => [k, d[k] != null ? d[k] / 100 : null])) };
+      } else p.pcError = 'PriceCharting has no match for this card name and number.';
+    } catch (e) { p.pcError = e.message && !/Failed to fetch|NetworkError|Load failed/i.test(e.message) ? 'PriceCharting: ' + e.message : 'Couldn\'t reach PriceCharting from the app. Its API may not allow requests from a browser; this needs a small server for the store version.'; }
+  }
+  state.price = p; state.priceLoading = false; markDirty(); renderPrice(); renderCardHead();
+}
+function pcLink(r) { return 'https://www.pricecharting.com/search-products?type=prices&q=' + encodeURIComponent(`${r.name} ${r.number || ''}`.trim()); }
+function renderPrice() {
+  const body = $('#price-body'), r = state.ref, p = state.price;
+  $('#price-refresh').hidden = !r || state.priceLoading;
+  if (state.demo) { body.innerHTML = '<p class="small muted">Prices appear here for your own cards once you link them to the card they are.</p>'; return; }
+  if (!r) {
+    body.innerHTML = `<p class="small muted">Link this to the card it is to see prices.</p>
+      <div class="row" style="gap:8px;flex-wrap:nowrap"><input id="ps-name" class="search" placeholder="Card name" value="${esc(state.name || '')}" style="flex:2"><input id="ps-num" class="search" placeholder="No. e.g. 041" inputmode="numeric" style="flex:1;min-width:0"></div>
+      <button class="btn block" id="ps-go" type="button">Find card</button><div id="ps-out"></div>`;
+    $('#ps-go').onclick = async () => {
+      const name = $('#ps-name').value.trim() || $('#cardname').value.trim(), num = $('#ps-num').value.trim(), out = $('#ps-out');
+      if (!name) { out.innerHTML = '<p class="small">Type the card\'s name first.</p>'; return; }
+      out.innerHTML = '<p class="small muted"><span class="spin"></span> Searching…</p>';
+      try {
+        const list = await searchCards(name, num);
+        if (!list.length) { out.innerHTML = '<p class="small">No cards found with that name. Check the spelling (English names).</p>'; return; }
+        out.innerHTML = '<div class="pick-grid">' + list.map((c, i) => `<button class="pick" type="button" data-i="${i}"><img alt="" loading="lazy" src="${esc(c.image ? c.image + '/low.webp' : '')}" onerror="this.style.visibility='hidden'"><span>${esc(c.name)}</span><span class="mono muted">${esc(c.localId)} · ${esc(String(c.id).split('-')[0])}</span></button>`).join('') + '</div>';
+        out.querySelectorAll('.pick').forEach(b => b.onclick = () => { const c = list[+b.dataset.i]; state.ref = { src: 'tcgdex', id: c.id, name: c.name, number: c.localId, image: c.image }; if (!state.name) { state.name = c.name; $('#cardname').value = c.name; } state.price = null; markDirty(); renderCardHead(); loadPrices(); });
+      } catch (e) { out.innerHTML = `<p class="small">${esc(NET_MSG)}</p>`; }
+    };
+    return;
+  }
+  let h = `<div class="refrow"><img alt="" src="${esc(r.image ? r.image + '/low.webp' : '')}" onerror="this.style.display='none'"><div><b>${esc(r.name)}</b><div class="small muted">${esc(r.setName || '')} ${esc(r.number || '')}${r.total ? '/' + esc(r.total) : ''}</div><button class="btn ghost small" id="ps-change" type="button">Change card</button></div></div>`;
+  if (state.priceLoading) h += '<p class="small muted"><span class="spin"></span> Getting prices…</p>';
+  else if (!p) h += '<button class="btn block" id="ps-load" type="button">Get prices</button>';
+  else {
+    if (p.rawError) h += `<p class="small">${esc(p.rawError)}</p>`;
+    else {
+      const rows = [];
+      (p.tcgplayer.variants || []).forEach(v => rows.push([`TCGplayer · ${v.name}`, money(v.market), 'market']));
+      if (p.cardmarket) { if (p.cardmarket.trend) rows.push(['Cardmarket', money(p.cardmarket.trend, 'EUR'), 'trend']); if (p.cardmarket.trendHolo) rows.push(['Cardmarket · holo', money(p.cardmarket.trendHolo, 'EUR'), 'trend']); }
+      h += `<h3>Raw (ungraded)</h3>` + (rows.length ? `<div class="tablewrap"><table><tbody>${rows.map(x => `<tr><td>${esc(x[0])}</td><td class="mono">${x[1]}</td><td class="small muted">${x[2]}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">No raw price listed for this card.</p>');
+      h += `<p class="small muted">Source: TCGdex. TCGplayer as of ${esc(fmtDate(p.tcgplayer.updated) || 'n/a')}${p.cardmarket ? `, Cardmarket as of ${esc(fmtDate(p.cardmarket.updated))}` : ''}. Fetched ${esc(fmtDate(p.fetchedAt))}.</p>`;
+    }
+    h += '<h3>By grade</h3>';
+    if (p.pc) {
+      const est = state.est || compute(), mine = {};
+      est.results.forEach(x => { const k = pcRowFor(x.co, x.grade, x.label); if (k) (mine[k] = mine[k] || []).push(`${x.co} ${GRADE.fmt(x.grade)}`); });
+      const mineRows = est.results.map(x => { const k = pcRowFor(x.co, x.grade, x.label); return [x.co, x.label, k ? money(p.pc.prices[k]) : '—']; });
+      h += `<div class="tablewrap"><table><thead><tr><th>Your estimate</th><th></th><th>Price</th></tr></thead><tbody>${mineRows.map(x => `<tr class="mine"><td class="co">${esc(x[0])}</td><td class="grade">${esc(x[1])}</td><td class="mono">${x[2]}</td></tr>`).join('')}</tbody></table></div>`;
+      h += `<details><summary class="small">All grades</summary><div class="tablewrap"><table><tbody>${PC_ROWS.map(([lab, k]) => `<tr class="${mine[k] ? 'mine' : ''}"><td>${esc(lab)}</td><td class="mono">${money(p.pc.prices[k])}</td></tr>`).join('')}</tbody></table></div></details>`;
+      h += `<p class="small muted">Source: PriceCharting (${esc(p.pc.name || '')}, ${esc(p.pc.set || '')}), fetched ${esc(fmtDate(p.fetchedAt))}. Check it's the right card and variant.</p>`;
+    } else {
+      if (p.pcError) h += `<p class="small">${esc(p.pcError)}</p>`;
+      else h += `<p class="small muted">Add a PriceCharting API key in Settings to see prices by grade here.</p>`;
+      h += `<a class="btn block" href="${esc(pcLink(r))}" target="_blank" rel="noopener">See prices by grade on PriceCharting ↗</a>`;
+    }
+  }
+  body.innerHTML = h;
+  const ch = $('#ps-change'); if (ch) ch.onclick = () => { state.ref = null; state.price = null; markDirty(); renderPrice(); renderCardHead(); };
+  const ld = $('#ps-load'); if (ld) ld.onclick = loadPrices;
+}
+
+/* ---------- settings ---------- */
+async function showPrefs() {
+  show('prefs');
+  $('#pc-token').value = pcToken(); $('#pc-status').textContent = pcToken() ? 'Key saved on this phone' : '';
+  const all = await DB.all(); let est = '';
+  try { const e = await navigator.storage.estimate(); est = ` · ${(e.usage / 1048576).toFixed(1)} MB used`; } catch (e) {}
+  $('#data-status').textContent = `${all.length} card${all.length === 1 ? '' : 's'} saved on this phone${est}. Photos and lines stay here and are not uploaded.` + (DB.db === null ? ' This browser won\'t keep them after you close the page.' : '');
+}
 
 /* ---------- images ---------- */
 function canvasOf(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -1663,6 +2091,7 @@ function setOutlineUi() {
   const name = state.step === 'front' ? 'front' : 'back';
   $('#rv-title').textContent = rv.outline ? `Check the ${name} outline` : `Check the ${name} borders`;
   $('#rv-stage').textContent = rv.outline ? 'Step 1 of 2 · card outline' : 'Step 2 of 2 · edge and border lines';
+  updateNav();
   $('#ol-retake').hidden = !rv.firstOutline || state.demo; $('#ol-cancel').hidden = rv.firstOutline;
   $('#ol-bar').hidden = !rv.outline; $('#rv-next').hidden = rv.outline;
   $('#rv-next').textContent = state.editing ? 'Update grades' : state.step === 'front' ? 'Next: photograph the back' : 'See grades';
@@ -1930,11 +2359,12 @@ function callText(est) {
 function openResults() {
   state.step = 'results'; show('results');
   $('#res-ex').hidden = !state.demo;
-  $('#cardname').value = state.name || '';
+  $('#cardname').value = state.name || ''; $('#cardname').disabled = state.demo;
   $('#edit-back').hidden = !state.sides.back;
-  $('#save').textContent = state.demo ? 'Example only' : state.savedId ? 'Update saved card' : 'Save to my cards';
-  $('#save').disabled = state.demo;
-  renderFlags(); renderResults(); renderDefects(); renderAiPanel();
+  $('#savebar').hidden = state.demo;
+  $('#save').textContent = state.savedId ? (state.dirty ? 'Save changes' : 'Saved ✓') : 'Save to binder';
+  $('#delete-card').hidden = !state.savedId;
+  renderFlags(); renderResults(); renderCardHead(); renderDefects(); renderAiPanel(); renderPrice();
 }
 function renderResults() {
   const est = compute(); state.est = est;
@@ -2010,7 +2440,7 @@ function renderDefects() {
       const thumb = maskedCanvas(s, x0, y0, z, z, 220); thumb.className = 'dthumb';
       row.innerHTML = `<div class="dinfo"><b>${k === 'front' ? 'Front' : 'Back'} · ${ZONE_NAME[d.kind][d.i]}</b><span class="small muted">${d.what} on ${(d.frac * 100).toFixed(1)}% of that area</span><span class="small">${esc(impact)}</span><div class="seg small"><button type="button" class="${off ? '' : 'on'}" data-v="1">I see it</button><button type="button" class="${off ? 'on' : ''}" data-v="0">Not there</button></div></div>`;
       row.prepend(thumb);
-      row.querySelectorAll('button').forEach(b => b.onclick = () => { s.dismiss = s.dismiss || {}; s.dismiss[key] = b.dataset.v === '0'; renderResults(); renderDefects(); });
+      row.querySelectorAll('button').forEach(b => b.onclick = () => { s.dismiss = s.dismiss || {}; s.dismiss[key] = b.dataset.v === '0'; markDirty(); renderResults(); renderCardHead(); renderDefects(); });
       list.append(row);
     }
   }
@@ -2020,7 +2450,7 @@ function renderDefects() {
 const FLAGS = [['crease', 'Crease or bend'], ['dent', 'Dent or indent'], ['scratch', 'Scratches on holo'], ['printline', 'Print lines'], ['stain', 'Stain or mark']];
 function renderFlags() {
   $('#flags').innerHTML = FLAGS.map(([k, l]) => `<label><input type="checkbox" id="fl-${k}" ${state.flags[k] ? 'checked' : ''}> ${l}</label>`).join('');
-  FLAGS.forEach(([k]) => $('#fl-' + k).onchange = e => { state.flags[k] = e.target.checked; renderResults(); });
+  FLAGS.forEach(([k]) => $('#fl-' + k).onchange = e => { state.flags[k] = e.target.checked; markDirty(); renderResults(); renderCardHead(); });
 }
 
 /* ---------- Claude second opinion ---------- */
@@ -2032,7 +2462,7 @@ function renderAiPanel() {
   out.innerHTML = `<div class="notes" style="margin-top:4px"><li class="${a.confidence === 'low' ? 'warn' : 'ok'}">${esc(a.summary || '')}</li></div>
     <ul class="small" style="margin:8px 0 0;padding-left:18px">${list((a.front && a.front.issues) || [])}${list((a.back && a.back.issues) || [])}</ul>
     <label class="switch" style="margin-top:10px"><input type="checkbox" id="use-ai" ${state.useAi ? 'checked' : ''}> Use Claude's findings in the grades</label>`;
-  $('#use-ai').onchange = e => { state.useAi = e.target.checked; renderResults(); };
+  $('#use-ai').onchange = e => { state.useAi = e.target.checked; markDirty(); renderResults(); renderCardHead(); };
 }
 function toBlob(canvas, q) { return new Promise(r => canvas.toBlob(r, 'image/jpeg', q || 0.88)); }
 async function runAi() {
@@ -2072,30 +2502,6 @@ Reply with JSON only, no prose: {"front":{"corners":[TL,TR,BR,BL],"edges":n,"sur
   }
 }
 
-/* ---------- history ---------- */
-const HKEY = 'pregrade.history.v1';
-function loadHist() { try { return JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch (e) { return []; } }
-function saveHist(list) { try { localStorage.setItem(HKEY, JSON.stringify(list.slice(0, 15))); return true; } catch (e) { return false; } }
-function thumb(s) { const c = canvasOf(CV.W, CV.H); putImg(c, s.canon); const t = canvasOf(90, 126); t.getContext('2d').drawImage(c, 0, 0, 90, 126); return t.toDataURL('image/jpeg', 0.7); }
-function saveCurrent() {
-  const list = loadHist(), est = state.est || compute();
-  const entry = { id: state.savedId || Date.now(), date: new Date().toISOString(), name: $('#cardname').value.trim(), thumb: thumb(state.sides.front),
-    grades: est.results.map(r => [r.co, r.co === 'TAG' ? `${GRADE.fmt(r.grade)} · ${r.score}` : r.label]), cent: [state.sides.front.cent.worst, state.sides.back ? state.sides.back.cent.worst : null] };
-  const i = list.findIndex(e => e.id === entry.id); if (i >= 0) list[i] = entry; else list.unshift(entry);
-  const ok = saveHist(list); state.savedId = entry.id; state.name = entry.name;
-  $('#save').textContent = ok ? 'Saved' : 'Could not save on this device';
-}
-function renderHome() {
-  const list = loadHist(), h = $('#hist');
-  $('#hist-count').textContent = list.length ? `${list.length} saved on this device` : '';
-  const items = list.map(e => `<div class="hitem"><img alt="" src="${esc(e.thumb)}"><div><b>${esc(e.name || 'Unnamed card')}</b><div class="small muted">${new Date(e.date).toLocaleDateString()} · front ${e.cent[0] ? Math.round(e.cent[0]) + '/' + Math.round(100 - e.cent[0]) : ''}</div><div class="chips">${e.grades.map(g => `<span class="chip">${esc(g[0])} ${esc(String(g[1]).replace(/^[A-Za-z\-\/+ ]+(?=\d)/, ''))}</span>`).join('')}</div></div><button class="btn ghost small" data-del="${e.id}" type="button" aria-label="Delete">Delete</button></div>`);
-  const demo = `<button class="hitem" id="open-demo" type="button"><canvas id="demo-thumb" width="90" height="126"></canvas><div><span class="tag-ex">Example</span><b style="display:block">Synthetic demo card</b><div class="chips" id="demo-chips"><span class="small muted">Preparing…</span></div></div><span class="muted">›</span></button>`;
-  h.innerHTML = items.join('') + demo;
-  h.querySelectorAll('[data-del]').forEach(b => b.onclick = ev => { ev.stopPropagation(); saveHist(loadHist().filter(e => String(e.id) !== b.dataset.del)); renderHome(); });
-  $('#open-demo').onclick = openDemo;
-  if (demoCache) paintDemoEntry();
-}
-
 /* ---------- demo ---------- */
 let demoCache = null;
 function buildDemo() {
@@ -2110,16 +2516,10 @@ function buildDemo() {
   demoCache = { front: mk('front', DEMO.DEMO.front, DEMO.DEMO.frontQuad), back: mk('back', DEMO.DEMO.back, DEMO.DEMO.backQuad) };
   return demoCache;
 }
-function paintDemoEntry() {
-  const d = demoCache, t = $('#demo-thumb'); if (!t) return;
-  const c = canvasOf(CV.W, CV.H); putImg(c, d.front.canon); t.getContext('2d').drawImage(c, 0, 0, 90, 126);
-  const est = GRADE.estimate({ front: measurementsOf(d.front), back: measurementsOf(d.back), flags: {} });
-  $('#demo-chips').innerHTML = est.results.map(r => `<span class="chip">${r.co} ${r.co === 'TAG' ? r.score : GRADE.fmt(r.grade)}</span>`).join('');
-}
 async function openDemo() {
   busy('Building the example…'); await nextFrame();
   const d = buildDemo(); busy('');
-  Object.assign(state, { sides: { front: d.front, back: d.back }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: true, editing: false, savedId: null, name: '' });
+  Object.assign(state, { sides: { front: d.front, back: d.back }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: true, editing: false, savedId: null, name: '', ref: null, price: null, dirty: false, chSide: 'front' });
   openResults();
 }
 
@@ -2137,10 +2537,14 @@ function renderSources() {
 }
 
 /* ---------- wiring ---------- */
-function startFlow() { startOrientation(); Object.assign(state, { sides: { front: null, back: null }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: false, editing: false, savedId: null, name: '' }); openCapture('front'); }
-$('#go-home').onclick = () => { show('home'); renderHome(); };
+function startFlow() {
+  if (inFlow()) return;
+  startOrientation();
+  Object.assign(state, { sides: { front: null, back: null }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: false, editing: false, savedId: null, created: null, name: '', ref: null, price: null, dirty: false, chSide: 'front' });
+  openCapture('front');
+}
 $('#start').onclick = startFlow;
-$('#again').onclick = startFlow;
+$('#open-demo').onclick = openDemo;
 $('#take').onclick = () => $('#f-cam').click();
 $('#pick').onclick = () => $('#f-pick').click();
 $('#use-file').onclick = () => $('#f-pick').click();
@@ -2150,12 +2554,31 @@ $('#shoot').onclick = () => captureLive();
 document.querySelectorAll('#zoom-seg button').forEach(b => b.onclick = () => setZoom(+b.dataset.z));
 $('#skip-back').onclick = () => { state.sides.back = null; openResults(); };
 $('#show-mask').onchange = renderDefects;
-$('#save').onclick = saveCurrent;
-$('#edit-front').onclick = () => { state.editing = true; state.step = 'front'; openReview(); };
-$('#edit-back').onclick = () => { state.editing = true; state.step = 'back'; openReview(); };
+$('#save').onclick = saveCard;
+$('#delete-card').onclick = deleteCard;
+$('#edit-front').onclick = () => { state.editing = true; state.step = 'front'; markDirty(); openReview(); };
+$('#edit-back').onclick = () => { state.editing = true; state.step = 'back'; markDirty(); openReview(); };
 $('#ai-go').onclick = runAi;
-bindReview(); renderSources(); renderHome(); show('home');
-setTimeout(() => { try { buildDemo(); paintDemoEntry(); } catch (e) { console.error(e); } }, 60);
+$('#nav-back').onclick = goBack;
+$('#sheet-ok').onclick = () => closeSheet(true);
+$('#sheet-cancel').onclick = () => closeSheet(false);
+$('#sheet').onclick = e => { if (e.target === $('#sheet')) closeSheet(false); };
+$('#cardname').oninput = () => { state.name = $('#cardname').value; markDirty(); updateNav(); };
+document.querySelectorAll('#ch-side button').forEach(b => b.onclick = () => { state.chSide = b.dataset.s; renderCardHead(); });
+$('#price-refresh').onclick = loadPrices;
+$('#b-search').oninput = renderBinder; $('#b-sort').onchange = renderBinder;
+$('#pc-save').onclick = () => { try { const v = $('#pc-token').value.trim(); if (v) localStorage.setItem('pregrade.pc', v); else localStorage.removeItem('pregrade.pc'); $('#pc-status').textContent = v ? 'Key saved on this phone' : 'Key removed'; } catch (e) { $('#pc-status').textContent = 'Couldn\'t save the key in this browser'; } };
+$('#wipe').onclick = async () => { if (await ask('Delete every saved card and its photos from this phone? This can\'t be undone.', 'Delete all')) { await DB.clear(); toast('All cards deleted'); showPrefs(); } };
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = async () => {
+  const t = b.dataset.tab;
+  if (t === 'grade') return startFlow();
+  if (inFlow() && hasUnsavedFlow() && !await ask('Stop grading this card? The photos will be discarded.', 'Discard')) return;
+  if (t === 'binder') showBinder(); else showPrefs();
+});
+bindReview(); renderSources();
+try { history.replaceState({}, '', location.pathname + location.search); } catch (e) {}
+pushNav();
+migrateLegacy().then(showBinder, showBinder);
 (function hookClaude(tries) {
   if (window.claude && typeof window.claude.use === 'function') {
     window.claude.use('sample').then(s => { sampleApi = s || null; if (!$('#results').hidden) renderAiPanel(); }).catch(() => {});
