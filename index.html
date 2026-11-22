@@ -293,9 +293,11 @@ tr.mine td { background: #FFF5D1; }
   <section id="prefs" class="view" hidden>
     <div class="panel">
       <h2>Prices</h2>
-      <p class="small muted">Raw (ungraded) prices come free from TCGdex: TCGplayer in US$ and Cardmarket in €. Prices by grade need a PriceCharting API key (a paid PriceCharting plan). The key stays on this phone.</p>
-      <div class="field"><label for="pc-token">PriceCharting API key</label><input id="pc-token" autocomplete="off" spellcheck="false" placeholder="Paste your key"></div>
-      <div class="row"><button class="btn" id="pc-save" type="button">Save key</button><span class="small muted" id="pc-status"></span></div>
+      <p class="small muted">Free: raw prices from TCGdex (TCGplayer US$, Cardmarket €), and an estimated PSA 9 and PSA 10 value worked out from the raw price.</p>
+      <details><summary class="small">Optional: real graded prices (paid PriceCharting key)</summary>
+        <div class="field" style="margin-top:8px"><label for="pc-token">PriceCharting API key</label><input id="pc-token" autocomplete="off" spellcheck="false" placeholder="Paste your key"></div>
+        <div class="row"><button class="btn" id="pc-save" type="button">Save key</button><span class="small muted" id="pc-status"></span></div>
+      </details>
     </div>
     <div class="panel">
       <h2>Your data</h2>
@@ -1662,8 +1664,11 @@ async function loadPrices() {
     const tp = pr.tcgplayer || {}, cm = pr.cardmarket || {};
     p.tcgplayer = { updated: tp.updated, variants: Object.keys(tp).filter(k => tp[k] && typeof tp[k] === 'object').map(k => ({ name: k, market: tp[k].marketPrice, low: tp[k].lowPrice, mid: tp[k].midPrice })) };
     p.cardmarket = cm.updated ? { updated: cm.updated, trend: cm.trend, avg30: cm.avg30, trendHolo: cm['trend-holo'], avg30Holo: cm['avg30-holo'] } : null;
-    const markets = p.tcgplayer.variants.map(v => v.market).filter(v => v > 0);
-    p.rawUsd = markets.length ? Math.max(...markets) : null;
+    const vs = p.tcgplayer.variants.filter(v => v.market > 0), pref = ['holofoil', 'holo', 'normal', '1stEditionHolofoil', 'unlimitedHolofoil'];
+    const main = pref.map(n => vs.find(v => v.name === n)).find(Boolean) || vs.sort((a, b) => b.market - a.market)[0];
+    p.rawUsd = main ? main.market : null; p.rawVariant = main ? main.name : null;
+    if (!p.rawUsd && p.cardmarket && p.cardmarket.trend) { p.rawEur = p.cardmarket.trend; }
+    p.setId = card.set && card.set.id || String(r.id).split('-')[0];
     if (card.set) { r.setName = card.set.name; r.total = card.set.cardCount && card.set.cardCount.official; }
   } catch (e) { p.rawError = NET_MSG; }
   const tok = pcToken();
@@ -1724,14 +1729,33 @@ function renderPrice() {
       h += `<details><summary class="small">All grades</summary><div class="tablewrap"><table><tbody>${PC_ROWS.map(([lab, k]) => `<tr class="${mine[k] ? 'mine' : ''}"><td>${esc(lab)}</td><td class="mono">${money(p.pc.prices[k])}</td></tr>`).join('')}</tbody></table></div></details>`;
       h += `<p class="small muted">Source: PriceCharting (${esc(p.pc.name || '')}, ${esc(p.pc.set || '')}), fetched ${esc(fmtDate(p.fetchedAt))}. Check it's the right card and variant.</p>`;
     } else {
+      h += estimateBlock(p);
       if (p.pcError) h += `<p class="small">${esc(p.pcError)}</p>`;
-      else h += `<p class="small muted">Add a PriceCharting API key in Settings to see prices by grade here.</p>`;
-      h += `<a class="btn block" href="${esc(pcLink(r))}" target="_blank" rel="noopener">See prices by grade on PriceCharting ↗</a>`;
+      h += `<a class="btn block" href="${esc(pcLink(r))}" target="_blank" rel="noopener">Check real graded sales on PriceCharting ↗</a>`;
     }
   }
   body.innerHTML = h;
   const ch = $('#ps-change'); if (ch) ch.onclick = () => { state.ref = null; state.price = null; markDirty(); renderPrice(); renderCardHead(); };
   const ld = $('#ps-load'); if (ld) ld.onclick = loadPrices;
+}
+
+/* Free estimate of graded value from the raw price, using published raw-to-graded multipliers (checked 22 Nov 2026):
+   modern PSA 10 ≈ 2–5× raw, typical 3.4–4.3×; PSA 9 ≈ 1.0–1.1× raw; vintage PSA 10 5–20× and often far more. */
+const EST = { checked: '22 Nov 2026', p10: [2, 5], p10typ: [3.4, 4.3], p9: [1.0, 1.1], v10: [5, 20] };
+function isVintage(setId) { const id = String(setId || '').toLowerCase(); return /^(base|gym|neo|lc|si1|ecard|ex|pop|np|basep|wp)/.test(id); }
+function estimateBlock(p) {
+  const raw = p.rawUsd, est = state.est || compute(), psa = est.results[0].grade;
+  if (!raw) return '<p class="small muted">No raw price to estimate from, so no graded estimate for this card.</p>';
+  const vint = isVintage(p.setId), r10 = vint ? EST.v10 : EST.p10, rng = (a, b) => `${money(raw * a)}–${money(raw * b)}`;
+  const rows = [
+    ['PSA 10', rng(r10[0], r10[1]) + (vint ? '' : `<div class="small muted">typical ${rng(EST.p10typ[0], EST.p10typ[1])}</div>`), `${r10[0]}–${r10[1]}× raw`, psa === 10],
+    ['PSA 9', rng(EST.p9[0], EST.p9[1]), `${EST.p9[0].toFixed(1)}–${EST.p9[1].toFixed(1)}× raw`, psa === 9],
+    ['Raw (ungraded)', money(raw), `TCGplayer ${esc(p.rawVariant || '')}`, false]
+  ];
+  let h = `<div class="tablewrap"><table><thead><tr><th>Grade</th><th>Estimated value</th><th>Basis</th></tr></thead><tbody>${rows.map(x => `<tr class="${x[3] ? 'mine' : ''}"><td class="co">${x[0]}</td><td class="mono">${x[1]}</td><td class="small muted">${x[2]}</td></tr>`).join('')}</tbody></table></div>`;
+  h += psa >= 9 ? `<p class="small">Your PSA estimate (${GRADE.fmt(psa)}) is highlighted.</p>` : `<p class="small">Your PSA estimate is ${GRADE.fmt(psa)}. There's no reliable multiplier below PSA 9; for modern cards those grades usually sell for no more than a raw copy.</p>`;
+  h += `<p class="small muted">Estimate, not a sale price: raw price × typical multipliers from published 2026 market analyses (checked ${EST.checked}). Real prices vary a lot by card${vint ? '. <b>Vintage card:</b> PSA 10 premiums range far wider than this, so treat it as very rough' : ''}${raw < 5 ? '. For cards worth a few dollars raw, multipliers are a poor guide' : ''}.</p>`;
+  return h;
 }
 
 /* ---------- settings ---------- */
