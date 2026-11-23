@@ -206,6 +206,8 @@ body.flow .savebar { bottom: calc(12px + env(safe-area-inset-bottom)); }
 .savebar .btn { box-shadow: 0 8px 22px rgba(31,63,209,.28); min-height: 50px; font-size: 16px; }
 .savebar.slide { animation: sb-in .18s ease-out; }
 @keyframes sb-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.border-call { border: 1.5px solid #E9B949; background: #FFF8E6; }
+.border-call b { font-size: 17px; }
 .saved-state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #1F7A4D; font-weight: 600; }
 .saved-state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #2FA36B; }
 .dwrap { position: relative; width: 104px; height: 104px; }
@@ -442,6 +444,12 @@ tr.mine td { background: #FFF5D1; }
       <span class="tag-ex" id="res-ex" hidden>Example · synthetic demo card</span>
       <div class="big" id="call"></div>
       <p class="muted small" id="call-why"></p>
+    </div>
+    <div class="panel border-call" id="bl" hidden>
+      <b id="bl-title"></b>
+      <p class="small" id="bl-why" style="margin:6px 0 10px"></p>
+      <div class="small muted" id="bl-cos" style="margin-bottom:10px"></div>
+      <button class="btn" id="bl-fix" type="button"></button>
     </div>
 
     <div class="panel">
@@ -1546,7 +1554,9 @@ async function goBack() {
     rv.outline = true; rv.firstOutline = true; rv.olQuad = cur().quad.map(p => p.slice()); return setOutlineUi();
   }
   if (v === 'capture') {
-    if (state.sides[state.step]) return openReview('outline');          // was retaking: keep the earlier photo
+    // Came here with Retake: back keeps the earlier photo. Came here by going back from that photo: back means "undo the photo".
+    if (state.sides[state.step] && state.retake) return openReview('outline');
+    if (state.sides[state.step]) state.sides[state.step] = null;
     if (state.step === 'back') { state.step = 'front'; return openReview('borders'); }
     return showBinder();
   }
@@ -1915,8 +1925,8 @@ function warningsFor(s) {
 
 /* ---------- capture ---------- */
 const cam = { zoom: 1, hwZoom: false, track: null, seed: null, worker: null, wBusy: false, lastSearch: 0, stream: null, video: null, raf: 0, lastA: 0, okSince: 0, prev: null, lap: [], busy: false, det: null, guide: null, crop: null, AW: 360 };
-async function openCapture(step) {
-  state.step = step; show('capture');
+async function openCapture(step, retake) {
+  state.retake = !!retake; state.step = step; show('capture');
   $('#cap-title').textContent = step === 'front' ? 'Photograph the front' : 'Now the back';
   $('#skip-back').hidden = step !== 'back';
   await startCamera();
@@ -2552,7 +2562,7 @@ function bindReview() {
   };
   $('#rv-outline').onclick = () => { rv.outline = true; rv.firstOutline = false; rv.olQuad = cur().quad.map(p => p.slice()); setOutlineUi(); };
   $('#ol-cancel').onclick = () => { rv.outline = false; setOutlineUi(); };
-  $('#ol-retake').onclick = () => openCapture(state.step);
+  $('#ol-retake').onclick = () => openCapture(state.step, true);
   $('#ol-outer').onclick = async () => {
     const s = cur(); busy('Finding the outer edge…'); await nextFrame();
     const nq = CV.expandFull(s.img, CV.orderPortrait(rv.olQuad.map(p => p.slice())), true);
@@ -2575,7 +2585,7 @@ function bindReview() {
     }
     rv.outline = false; rv.firstOutline = false; setOutlineUi();
   };
-  $('#rv-retake').onclick = () => openCapture(state.step);
+  $('#rv-retake').onclick = () => openCapture(state.step, true);
   $('#rv-next').onclick = () => {
     if (state.editing || state.step === 'back') { state.editing = false; openResults(); }
     else openCapture('back');
@@ -2593,6 +2603,38 @@ function measurementsOf(s) {
 function compute() {
   const F = state.sides.front, B = state.sides.back;
   return GRADE.estimate({ front: measurementsOf(F), back: B ? measurementsOf(B) : null, flags: state.flags, ai: state.aiPoints, useAi: state.useAi });
+}
+// Borderline: each border line is only known to about ±0.1 mm. If that much could move a card across a grade limit, say so.
+const LINE_TOL = 0.1;
+function centBand(s) {
+  const e = LINE_TOL * CV.MM, b = s.b, dl = 100 * e / (b.L + b.R), dt = 100 * e / (b.T + b.B), c = s.cent;
+  return { lo: Math.max(50, c.lrWorst - dl, c.tbWorst - dt), hi: Math.max(c.lrWorst + dl, c.tbWorst + dt) };
+}
+function computeAt(mode, only) {
+  const m = k => { const s = state.sides[k]; if (!s) return null; const r = measurementsOf(s); if (!only || only === k) r.cent = { worst: centBand(s)[mode] }; return r; };
+  return GRADE.estimate({ front: m('front'), back: m('back'), flags: state.flags, ai: state.aiPoints, useAi: state.useAi });
+}
+function borderline() {
+  const lo = computeAt('lo'), hi = computeAt('hi'), g = r => r.grade;
+  const cos = lo.results.map((r, i) => ({ co: r.co, best: r, worst: hi.results[i] })).filter(x => g(x.best) !== g(x.worst));
+  const psa = cos.find(x => x.co === 'PSA');
+  if (!psa) return null;
+  // which side does it, and which limit sits inside its range
+  const sides = ['front', 'back'].filter(k => state.sides[k] && computeAt('lo', k).results[0].grade !== computeAt('hi', k).results[0].grade);
+  const k = sides[0] || 'front', s = state.sides[k], band = centBand(s), col = k === 'front' ? 1 : 2;
+  const lim = GRADE.STANDARDS.PSA.rows.map(r => [r[0], r[col]]).filter(([, l]) => l >= band.lo && l < band.hi).sort((a, b) => b[1] - a[1])[0];
+  return { cos, psa, side: k, band, lim, now: s.cent.worst };
+}
+function renderBorderline() {
+  const bl = state.demo ? null : borderline(), box = $('#bl'); box.hidden = !bl; if (!bl) return;
+  const f = v => `${v.toFixed(1)}/${(100 - v).toFixed(1)}`, side = bl.side === 'front' ? 'front' : 'back';
+  $('#bl-title').textContent = `Borderline: PSA ${GRADE.fmt(bl.psa.worst.grade)} or ${GRADE.fmt(bl.psa.best.grade)}`;
+  $('#bl-why').textContent = `The ${side} centering measures ${f(bl.now)}.` + (bl.lim ? ` PSA's limit for a ${bl.lim[0]} is ${bl.lim[1]}/${100 - bl.lim[1]} on the ${side}.` : '') +
+    ` Moving one border line by just ${LINE_TOL} mm gives anything from ${f(bl.band.lo)} to ${f(bl.band.hi)}, so this is too close to call from a photo. Check the ${side} lines at high zoom, or retake in sharper light. In hand, a grader could go either way.`;
+  const fmtR = r => GRADE.fmt(r.grade);
+  $('#bl-cos').textContent = 'Could land: ' + bl.cos.map(x => `${x.co} ${fmtR(x.worst)}–${fmtR(x.best)}`).join(' · ');
+  $('#bl-fix').textContent = `Re-check ${side} lines`;
+  $('#bl-fix').onclick = () => { state.editing = true; state.step = bl.side; markDirty(); openReview(); };
 }
 function callText(est) {
   const r = Object.fromEntries(est.results.map(x => [x.co, x])), psa = r.PSA, bgs = r.BGS, fmt = GRADE.fmt;
@@ -2615,6 +2657,7 @@ function openResults() {
 function renderResults() {
   const est = compute(); state.est = est;
   const [big, why] = callText(est); $('#call').textContent = big; $('#call-why').textContent = why;
+  renderBorderline();
   $('#verdict').innerHTML = `<thead><tr><th>Company</th><th>Estimate</th><th>Held back by</th></tr></thead><tbody>` + est.results.map(r => `<tr class="${r === est.best ? 'best' : ''}"><td class="co">${r.co}</td><td><span class="grade">${esc(r.label)}</span>${r.note ? `<div class="small muted">${esc(r.note)}</div>` : ''}</td><td>${esc(r.limit)}</td></tr>`).join('') + `</tbody>`;
   const B = state.sides.back;
   $('#verdict-note').textContent = (B ? '' : 'Back not photographed, so grades assume a clean, centred back. ') + `Highlighted row: the slab most likely to read best. Standards checked ${GRADE.STANDARDS.checked}.`;
