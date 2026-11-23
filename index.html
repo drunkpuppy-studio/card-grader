@@ -204,6 +204,13 @@ body.flow .tabs { display: none; }
 .savebar { position: sticky; bottom: calc(var(--tab-h) + 12px + env(safe-area-inset-bottom)); z-index: 5; }
 body.flow .savebar { bottom: calc(12px + env(safe-area-inset-bottom)); }
 .savebar .btn { box-shadow: 0 8px 22px rgba(31,63,209,.28); min-height: 50px; font-size: 16px; }
+.savebar.slide { animation: sb-in .18s ease-out; }
+@keyframes sb-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.saved-state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #1F7A4D; font-weight: 600; }
+.saved-state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #2FA36B; }
+.dwrap { position: relative; width: 104px; height: 104px; }
+.dwrap .dloc { position: absolute; right: 4px; bottom: 4px; width: 30px; height: 42px; border-radius: 4px; background: rgba(255,255,255,.92); box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.dwhere { font-size: 13px; color: var(--ink); }
 .btn.danger { color: var(--bad); border-color: #EDC0BC; }
 .center { text-align: center; }
 .toast { position: fixed; left: 50%; bottom: calc(var(--tab-h) + 84px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 50; }
@@ -427,6 +434,7 @@ tr.mine td { background: #FFF5D1; }
       <div class="ch-info">
         <input id="cardname" class="titleinput" placeholder="Name this card" aria-label="Card name">
         <span class="small muted" id="ch-ref"></span>
+        <span class="saved-state" id="ch-saved" hidden></span>
         <div class="ch-chips" id="ch-chips"></div>
       </div>
     </div>
@@ -1127,6 +1135,14 @@ tr.mine td { background: #FFF5D1; }
     const SK = ['L', 'R', 'T', 'B'], bw = SK.map(k => borders[k].px || 30);
     const s0 = 0.25 * MM, s1 = 1.0 * MM, b0 = 1.3 * MM;
     const strip = [[], [], [], []], band = [[], [], [], []];
+    // Local brightness along each edge in 5 mm steps, so a lighting gradient or broad glare raises its own reference
+    const SEG = 5 * MM, along = (i, k) => k < 2 ? (i / W) | 0 : i % W, segL = [[], [], [], []];
+    for (let i = 0; i < N; i += 2) {
+      const v = dd[i]; if (v < s0 || v > s1 || cr[i] >= 0) continue; const k = sd[i], g = Math.floor(along(i, k) / SEG), p = i * 4;
+      (segL[k][g] = segL[k][g] || []).push((d[p] + d[p + 1] + d[p + 2]) / 3);
+    }
+    // Segments inside a corner zone have no samples of their own: they borrow the nearest segment along the same edge.
+    const locL = segL.map(arr => { const o = Array.from(arr, a => a && a.length > 8 ? pct(a, 0.4) : null); for (let g = 0; g < o.length; g++) if (o[g] == null) { for (let r = 1; r < o.length; r++) { const a2 = o[g - r] != null ? o[g - r] : o[g + r]; if (a2 != null) { o[g] = a2; break; } } } return o; });
     for (let i = 0; i < N; i += 3) {
       const v = dd[i]; if (v < 0) continue; const p = i * 4, col = [d[p], d[p + 1], d[p + 2]];
       if (v >= s0 && v <= s1 && cr[i] < 0) strip[sd[i]].push(col);
@@ -1147,8 +1163,13 @@ tr.mine td { background: #FFF5D1; }
       const isGlare = mn > 246 && mx >= 252; if (isGlare) glare++;
       if (v >= s0 && v <= s1) {
         const ref = cr[i] >= 0 ? cref[cr[i]] : sref[sd[i]], m0 = Math.min(ref[0], ref[1], ref[2]), L0 = (ref[0] + ref[1] + ref[2]) / 3;
-        const wh = (mn - m0) / (256 - m0), L = (r + g + b) / 3;
-        if (wh > 0.3 && L > L0 + 18 && mn > 140) candW[i] = 1;
+        const wh = (mn - m0) / (256 - m0), L = (r + g + b) / 3, k = sd[i], loc = locL[k][Math.floor(along(i, k) / SEG)];
+        // Whitening is pale and grey-white (low colour), brighter than both the edge overall and its own neighbourhood.
+        // Holo sparkle is colourful; glare and uneven light lift the neighbourhood too. Holo/artwork borders need a stronger signal.
+        // "Off-white" test: a whitened pixel is the edge colour mixed with white, so it sits on the line from the edge colour to white.
+        const holo = skip[k], vx = 255 - ref[0], vy = 255 - ref[1], vz = 255 - ref[2], ux = r - ref[0], uy = g - ref[1], uz = b - ref[2];
+        const t = (ux * vx + uy * vy + uz * vz) / Math.max(1, vx * vx + vy * vy + vz * vz), off = Math.hypot(ux - t * vx, uy - t * vy, uz - t * vz);
+        if (wh > (holo ? 0.42 : 0.3) && L > L0 + (holo ? 28 : 18) && mn > 140 && off < (holo ? 28 : 40) && (loc == null || L > loc + (holo ? 20 : 14))) candW[i] = 1;
         if (cr[i] >= 0) zt.c[cr[i]]++; else zt.e[SIDE_TO_EDGE[sd[i]]]++;
       } else if (v > b0 && v < bw[sd[i]] - 0.6 * MM && !skip[sd[i]]) {
         zt.s[sd[i]]++;
@@ -1165,10 +1186,47 @@ tr.mine td { background: #FFF5D1; }
       if (candW[i]) { mask[i] = 1; if (cr[i] >= 0) zw.c[cr[i]]++; else zw.e[SIDE_TO_EDGE[sd[i]]]++; }
       else { mask[i] = 2; zw.s[sd[i]]++; }
     }
+    // Group flagged pixels into spots. Real whitening starts at the cut edge, so a whitening spot that never
+    // reaches the outer 0.45 mm is dropped (holo sparkle and reflections sit further in).
+    const zkey = i => mask[i] === 1 ? (cr[i] >= 0 ? 'c' + cr[i] : 'e' + SIDE_TO_EDGE[sd[i]]) : 's' + sd[i];
+    const seen = new Uint8Array(N), spots = [], stack = [], touch = s0 + 0.2 * MM;
+    for (let i0 = 0; i0 < N; i0++) {
+      if (!mask[i0] || mask[i0] === 3 || seen[i0]) continue;
+      const val = mask[i0], px = []; let minV = 1e9; stack.push(i0); seen[i0] = 1;
+      while (stack.length) {
+        const i = stack.pop(); px.push(i); if (dd[i] < minV) minV = dd[i];
+        const x = i % W, y = (i / W) | 0;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          const xx = x + ox, yy = y + oy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const j = yy * W + xx; if (!seen[j] && mask[j] === val) { seen[j] = 1; stack.push(j); }
+        }
+      }
+      if (val === 1 && minV > touch) {
+        for (const i of px) { mask[i] = 0; if (cr[i] >= 0) zw.c[cr[i]]--; else zw.e[SIDE_TO_EDGE[sd[i]]]--; }
+        continue;
+      }
+      let x0 = W, y0 = H, x1 = 0, y1 = 0, sx = 0, sy = 0;
+      for (const i of px) { const x = i % W, y = (i / W) | 0; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (val === 1) {
+        // Glare spills inward; whitening stops at the edge. Compare the plain border just inside this spot with the border overall.
+        const k = sd[px[0]], bl = (bmed[k][0] + bmed[k][1] + bmed[k][2]) / 3, ex = 2 * MM; let a = 0, n = 0;
+        for (let y = Math.max(0, y0 - ex); y <= Math.min(H - 1, y1 + ex); y += 2) for (let x = Math.max(0, x0 - ex); x <= Math.min(W - 1, x1 + ex); x += 2) {
+          const j = y * W + x, v = dd[j]; if (v < b0 || v > b0 + 1.2 * MM) continue; const p = j * 4; a += (d[p] + d[p + 1] + d[p + 2]) / 3; n++;
+        }
+        if (n > 20 && a / n > bl + 25) { for (const i of px) { mask[i] = 3; if (cr[i] >= 0) zw.c[cr[i]]--; else zw.e[SIDE_TO_EDGE[sd[i]]]--; } continue; }
+      }
+      spots.push({ key: zkey(px[0]), x: sx / px.length, y: sy / px.length, x0, y0, x1, y1, n: px.length });
+    }
+    spots.sort((a, b) => b.n - a.n);
+    // A corner or edge where most of the strip lights up is a lighting problem (glare, uneven light), not whitening.
+    const LIGHT = 0.35, lightC = zw.c.map((w, i) => zt.c[i] && w / zt.c[i] > LIGHT), lightE = zw.e.map((w, i) => zt.e[i] && w / zt.e[i] > LIGHT);
+    for (let i = 0; i < N; i++) if (mask[i] === 1 && (cr[i] >= 0 ? lightC[cr[i]] : lightE[SIDE_TO_EDGE[sd[i]]])) mask[i] = 3;
+    const spotsOut = spots.filter(sp => !(sp.key[0] === 'c' ? lightC[+sp.key[1]] : sp.key[0] === 'e' ? lightE[+sp.key[1]] : false));
     let sa = 0, sn = 0; for (let k = 0; k < 4; k++) if (!skip[k]) { sa += zw.s[k]; sn += zt.s[k]; }
     return {
-      corners: zw.c.map((w, i) => ({ frac: zt.c[i] ? w / zt.c[i] : 0, glare: cg[i] > 25 })),
-      edges: zw.e.map((w, i) => ({ frac: zt.e[i] ? w / zt.e[i] : 0 })),
+      spots: spotsOut,
+      corners: zw.c.map((w, i) => ({ frac: lightC[i] ? 0 : zt.c[i] ? w / zt.c[i] : 0, glare: cg[i] > 25, light: !!lightC[i] })),
+      edges: zw.e.map((w, i) => ({ frac: lightE[i] ? 0 : zt.e[i] ? w / zt.e[i] : 0, light: !!lightE[i] })),
       surface: { frac: sn ? sa / sn : 0, sides: SK.map((k, i) => ({ a: zw.s[i], n: zt.s[i], skipped: skip[i] })) },
       glare: tot ? glare / tot : 0,
       mask
@@ -1599,7 +1657,7 @@ async function saveCard() {
   busy('');
   if (!ok) { toast('Couldn\'t save on this device'); return; }
   const first = !state.savedId;
-  state.savedId = rec.id; state.created = rec.created; state.dirty = false;
+  state.savedId = rec.id; state.created = rec.created; state.updated = rec.updated; state.dirty = false;
   toast(first ? 'Saved to your binder' : 'Changes saved');
   openResults();
 }
@@ -1616,7 +1674,7 @@ async function openSaved(id) {
   try {
     const front = await loadSide(rec.sides.front), back = rec.sides.back ? await loadSide(rec.sides.back) : null;
     Object.assign(state, { sides: { front, back }, flags: rec.flags || {}, ai: rec.ai || null, aiPoints: rec.aiPoints || null, useAi: !!rec.useAi, demo: false, editing: false,
-      savedId: rec.id, created: rec.created, name: rec.name || '', ref: rec.ref || null, price: rec.price || null, dirty: false, chSide: 'front' });
+      savedId: rec.id, created: rec.created, updated: rec.updated || rec.created, name: rec.name || '', ref: rec.ref || null, price: rec.price || null, dirty: false, chSide: 'front' });
   } catch (e) { busy(''); toast('Couldn\'t open that card'); return; }
   busy(''); openResults();
 }
@@ -1625,7 +1683,16 @@ async function deleteCard() {
   if (!await ask(`Delete "${state.name || 'this card'}" and its photos from your binder?`, 'Delete')) return;
   await DB.del(state.savedId); state.savedId = null; state.dirty = false; toast('Deleted'); showBinder();
 }
-function markDirty() { if (state.savedId) { state.dirty = true; $('#save').textContent = 'Save changes'; } }
+// Save bar: shown only when there is something to save. A saved card with no changes shows a quiet "Saved" line instead.
+function updateSaveBar() {
+  const bar = $('#savebar'), need = !state.demo && (!state.savedId || state.dirty);
+  if (need && bar.hidden) { bar.classList.remove('slide'); void bar.offsetWidth; bar.classList.add('slide'); }
+  bar.hidden = !need;
+  $('#save').textContent = state.savedId ? 'Save changes' : 'Save to binder';
+  const tag = $('#ch-saved'); tag.hidden = !state.savedId || state.dirty || state.demo;
+  if (state.savedId) tag.textContent = 'Saved in binder' + (state.updated ? ' · ' + new Date(state.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '');
+}
+function markDirty() { if (state.savedId) { state.dirty = true; updateSaveBar(); } }
 
 /* ---------- card header on the results page ---------- */
 function renderCardHead() {
@@ -2541,8 +2608,7 @@ function openResults() {
   $('#res-ex').hidden = !state.demo;
   $('#cardname').value = state.name || ''; $('#cardname').disabled = state.demo;
   $('#edit-back').hidden = !state.sides.back;
-  $('#savebar').hidden = state.demo;
-  $('#save').textContent = state.savedId ? (state.dirty ? 'Save changes' : 'Saved ✓') : 'Save to binder';
+  updateSaveBar();
   $('#delete-card').hidden = !state.savedId;
   renderFlags(); renderResults(); renderCardHead(); renderDefects(); renderAiPanel(); renderPrice();
 }
@@ -2591,11 +2657,42 @@ function defectsOf(s) {
   s.cond.surface.sides.forEach((v, i) => { if (!v.skipped && v.n && v.a / v.n >= 0.004) out.push({ kind: 's', i, frac: v.a / v.n, what: 'Spots or scratches' }); });
   return out;
 }
+function spotsOf(s, d) { return (s.cond.spots || []).filter(p => p.key === d.kind + d.i); }
 function defectCrop(s, d) {
-  const z = d.kind === 'c' ? 80 : 60;
+  const z = 80;   // 8 mm square
   if (d.kind === 'c') return [[0, 0], [CV.W - z, 0], [CV.W - z, CV.H - z], [0, CV.H - z]][d.i].concat([z]);
-  const cc = CV.zoneCenter(s.cond, d.kind, d.i) || [CV.W / 2, CV.H / 2];
+  const sp = spotsOf(s, d)[0], cc = sp ? [sp.x, sp.y] : CV.zoneCenter(s.cond, d.kind, d.i) || [CV.W / 2, CV.H / 2];
   return [Math.max(0, Math.min(CV.W - z, Math.round(cc[0] - z / 2))), Math.max(0, Math.min(CV.H - z, Math.round(cc[1] - z / 2))), z];
+}
+// Where the biggest spot is, in words a person can find on the card in hand.
+function spotWhere(s, d) {
+  const sp = spotsOf(s, d), n = sp.length; if (!n) return '';
+  const b = sp[0], mm = v => Math.max(1, Math.round(v / CV.MM)), size = Math.max(b.x1 - b.x0, b.y1 - b.y0) / CV.MM;
+  const sz = size < 0.3 ? 'a tiny spot' : `about ${size.toFixed(1)} mm long`;
+  let where;
+  if (d.kind === 'c') where = 'Right at the corner';
+  else if (d.kind === 'e') where = d.i === 0 || d.i === 2 ? `${mm(b.x)} mm from the left end` : `${mm(b.y)} mm down from the top`;
+  else where = (d.i < 2 ? `${mm(b.y)} mm down from the top` : `${mm(b.x)} mm from the left`) + ` on the ${['left', 'right', 'top', 'bottom'][d.i]} border`;
+  return `${where}, ${sz}` + (n > 1 ? `. ${n} spots here; the red dots on the mini card show all of them.` : '.');
+}
+// Mini card with a dot for each spot in this zone (biggest one larger).
+function locatorCanvas(s, d) {
+  const c = canvasOf(60, 84), x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, 60, 84);
+  x.strokeStyle = '#8A8F98'; x.lineWidth = 2; x.beginPath(); x.roundRect(3, 3, 54, 78, 5); x.stroke();
+  spotsOf(s, d).slice(0, 12).forEach((p, j) => { x.fillStyle = '#E0249A'; x.beginPath(); x.arc(3 + p.x / CV.W * 54, 3 + p.y / CV.H * 78, j ? 2.6 : 4.2, 0, 7); x.fill(); });
+  if (d.kind === 'c' && !spotsOf(s, d).length) { const p = [[6, 6], [54, 6], [54, 78], [6, 78]][d.i]; x.fillStyle = '#E0249A'; x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill(); }
+  return c;
+}
+// Ring around each spot inside the thumbnail, so the eye lands on it.
+function ringSpots(thumb, s, d, x0, y0, z) {
+  const x = thumb.getContext('2d'), k = thumb.width / z;
+  x.strokeStyle = '#E0249A'; x.lineWidth = 2.5;
+  for (const p of spotsOf(s, d).slice(0, 6)) {
+    const cx = (p.x - x0) * k, cy = (p.y - y0) * k, r = Math.max(9, (Math.max(p.x1 - p.x0, p.y1 - p.y0) / 2 + 4) * k);
+    if (cx < -r || cy < -r || cx > thumb.width + r || cy > thumb.height + r) continue;
+    x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke();
+  }
 }
 function renderDefects() {
   const cards = $('#cards'), list = $('#defects'); cards.innerHTML = ''; list.innerHTML = '';
@@ -2606,6 +2703,8 @@ function renderDefects() {
     const cap = document.createElement('figcaption'); cap.innerHTML = `<span>${k === 'front' ? 'Front' : 'Back'}</span><span class="mono">${s.cent.lr[0].toFixed(0)}/${s.cent.lr[1].toFixed(0)} · ${s.cent.tb[0].toFixed(0)}/${s.cent.tb[1].toFixed(0)}</span>`;
     fig.append(cv, cap); cards.append(fig);
     const skipped = s.cond.surface.sides.map((v, i) => v.skipped ? ['left', 'right', 'top', 'bottom'][i] : null).filter(Boolean);
+    const lit = [...s.cond.corners.map((c, i) => c.light ? ZONE_NAME.c[i] : null), ...s.cond.edges.map((e, i) => e.light ? ZONE_NAME.e[i] : null)].filter(Boolean);
+    if (lit.length) { const p = document.createElement('p'); p.className = 'small muted'; p.textContent = `${k === 'front' ? 'Front' : 'Back'}: too much glare or uneven light on the ${lit.join(', ')} to judge whitening, so ${lit.length > 1 ? 'they weren\'t' : 'it wasn\'t'} scored. Retake in softer light, or check by eye.`; list.append(p); }
     if (skipped.length) { const p = document.createElement('p'); p.className = 'small muted'; p.textContent = `${k === 'front' ? 'Front' : 'Back'}: the ${skipped.join(', ')} border${skipped.length > 1 ? 's have' : ' has'} artwork or holo pattern in it, so spots there weren't scored. Check those by eye.`; list.append(p); }
     for (const d of defectsOf(s)) {
       count++;
@@ -2617,9 +2716,15 @@ function renderDefects() {
         : (other !== now ? `Counted: ${cat} ${GRADE.fmt(now)}. If it's not there: ${GRADE.fmt(other)}${psaAlt !== psaNow ? `, PSA ${psaAlt}` : ''}.` : `Counted, but too small to change the ${cat} grade on its own.`);
       const [x0, y0, z] = defectCrop(s, d), row = document.createElement('div');
       row.className = 'defect' + (off ? ' off' : '');
-      const thumb = maskedCanvas(s, x0, y0, z, z, 220); thumb.className = 'dthumb';
-      row.innerHTML = `<div class="dinfo"><b>${k === 'front' ? 'Front' : 'Back'} · ${ZONE_NAME[d.kind][d.i]}</b><span class="small muted">${d.what} on ${(d.frac * 100).toFixed(1)}% of that area</span><span class="small">${esc(impact)}</span><div class="seg small"><button type="button" class="${off ? '' : 'on'}" data-v="1">I see it</button><button type="button" class="${off ? 'on' : ''}" data-v="0">Not there</button></div></div>`;
-      row.prepend(thumb);
+      const thumb = maskedCanvas(s, x0, y0, z, z, 220); thumb.className = 'dthumb'; ringSpots(thumb, s, d, x0, y0, z);
+      const wrap = document.createElement('div'); wrap.className = 'dwrap'; const loc = locatorCanvas(s, d); loc.className = 'dloc'; wrap.append(thumb, loc);
+      { // keep the mini card on the side away from the spot
+        const sp = spotsOf(s, d)[0], fx = sp ? (sp.x - x0) / z : [0, 1, 1, 0][d.i], fy = sp ? (sp.y - y0) / z : [0, 0, 1, 1][d.i];
+        Object.assign(loc.style, fx > 0.5 ? { left: '4px', right: 'auto' } : { right: '4px', left: 'auto' }, fy > 0.5 ? { top: '4px', bottom: 'auto' } : { bottom: '4px', top: 'auto' });
+      }
+      const where = spotWhere(s, d);
+      row.innerHTML = `<div class="dinfo"><b>${k === 'front' ? 'Front' : 'Back'} · ${ZONE_NAME[d.kind][d.i]}</b>${where ? `<span class="dwhere">${esc(where)}</span>` : ''}<span class="small muted">${d.what} on ${(d.frac * 100).toFixed(1)}% of that area</span><span class="small">${esc(impact)}</span><div class="seg small"><button type="button" class="${off ? '' : 'on'}" data-v="1">I see it</button><button type="button" class="${off ? 'on' : ''}" data-v="0">Not there</button></div></div>`;
+      row.prepend(wrap);
       row.querySelectorAll('button').forEach(b => b.onclick = () => { s.dismiss = s.dismiss || {}; s.dismiss[key] = b.dataset.v === '0'; markDirty(); renderResults(); renderCardHead(); renderDefects(); });
       list.append(row);
     }
