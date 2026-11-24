@@ -49,6 +49,10 @@ p { margin: 0; }
 .small { font-size: 13px; }
 .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row.minor .btn { min-height: 38px; font-size: 14px; }
+.stepnav { display: flex; gap: 10px; margin-top: 14px; }
+.stepnav .btn { flex: 1; min-height: 50px; }
+.stepnav .btn.primary { flex: 2.2; font-size: 16px; }
 .btn { appearance: none; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; padding: 11px 16px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
 .btn:hover { border-color: #B9BDB3; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -395,7 +399,7 @@ tr.mine td { background: #FFF5D1; }
           <button class="ctile" id="ctb-3" type="button"><canvas id="ct-3" width="240" height="240"></canvas><span>Bottom-left</span></button>
           <button class="ctile" id="ctb-2" type="button"><canvas id="ct-2" width="240" height="240"></canvas><span>Bottom-right</span></button>
         </div>
-        <p class="small muted tile-hint">Tap a corner, then drag to move it or pinch to zoom.</p>
+        <p class="small muted tile-hint">Tap a corner. One finger moves it; two fingers zoom and slide along the edge.</p>
         <div class="dpad"><span class="small" id="dp-name"></span>
           <div class="dpad-keys"><button class="btn" id="dp-u" type="button" aria-label="Move up">▲</button><button class="btn" id="dp-l" type="button" aria-label="Move left">◀</button><button class="btn" id="dp-d" type="button" aria-label="Move down">▼</button><button class="btn" id="dp-r" type="button" aria-label="Move right">▶</button></div>
         </div>
@@ -416,18 +420,21 @@ tr.mine td { background: #FFF5D1; }
       <div class="ratios" id="ratios"></div>
       </div>
     </div>
-    <div class="row">
-      <button class="btn" id="rv-retake" type="button">Retake</button>
-      <button class="btn" id="rv-outline" type="button">Move corners</button>
+    <div class="row minor">
+      <button class="btn" id="rv-retake" type="button">Retake photo</button>
       <button class="btn" id="rv-reset" type="button">Reset lines</button>
     </div>
-    <div class="row" id="ol-bar" hidden>
-      <button class="btn primary" id="ol-apply" type="button">Outline is on the card edge</button>
+    <div class="row minor" id="ol-bar" hidden>
       <button class="btn" id="ol-outer" type="button">Outline on the inner frame? Snap outward</button>
-      <button class="btn" id="ol-retake" type="button">Retake</button>
-      <button class="btn" id="ol-cancel" type="button">Cancel</button>
     </div>
-    <button class="btn primary block" id="rv-next" type="button">Next: photograph the back</button>
+    <!-- step navigation: back on the left, next on the right, same place on every step -->
+    <div class="stepnav">
+      <button class="btn" id="rv-outline" type="button">‹ Corners</button>
+      <button class="btn" id="ol-retake" type="button">‹ Retake</button>
+      <button class="btn" id="ol-cancel" type="button">Cancel</button>
+      <button class="btn primary" id="ol-apply" type="button">Next: borders</button>
+      <button class="btn primary" id="rv-next" type="button">Next: back of card</button>
+    </div>
   </section>
 
   <!-- RESULTS -->
@@ -2192,7 +2199,7 @@ function alertBox(msg) { $('#nolive-msg').textContent = msg; }
 // Step 2 (borders): straightened card plus PAD px of background. Per side two hairlines: the card's cut edge (green)
 // and the inner edge of the printed border (blue dashed). A zoomed close-up of the selected side lets you place them precisely.
 const PAD = 40;
-const rv = { drag: null, sel: 'iL', outline: false, olQuad: null, olScale: 1, corner: 0, cuPos: 0.5, cu: null, cuFreeze: null, cuZoom: 1, tileZ: [1, 1, 1, 1], tileFreeze: null };
+const rv = { drag: null, sel: 'iL', outline: false, olQuad: null, olScale: 1, corner: 0, cuPos: 0.5, cu: null, cuFreeze: null, cuZoom: 1, tileV: [0, 1, 2, 3].map(() => ({ z: 1, ox: 0, oy: 0 })), tileFreeze: null };
 const ZOOMS = [1, 1.5, 2, 3, 4, 6];
 const stepZoom = (z, dir) => { const i = ZOOMS.findIndex(v => v >= z - 1e-6); return ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? ZOOMS.length - 1 : i) + dir))]; };
 const SIDE_NAME = { L: 'left', R: 'right', T: 'top', B: 'bottom' };
@@ -2251,9 +2258,10 @@ function setOutlineUi() {
   $('#rv-stage').textContent = rv.outline ? 'Step 1 of 2 · card outline' : 'Step 2 of 2 · edge and border lines';
   updateNav();
   $('#ol-retake').hidden = !rv.firstOutline || state.demo; $('#ol-cancel').hidden = rv.firstOutline;
-  $('#ol-bar').hidden = !rv.outline; $('#rv-next').hidden = rv.outline;
-  $('#rv-next').textContent = state.editing ? 'Update grades' : state.step === 'front' ? 'Next: photograph the back' : 'See grades';
-  ['#rv-retake', '#rv-outline', '#rv-reset'].forEach(s => $(s).hidden = rv.outline || (s === '#rv-retake' && state.demo));
+  $('#ol-bar').hidden = !rv.outline; $('#rv-next').hidden = rv.outline; $('#ol-apply').hidden = !rv.outline;
+  $('#rv-outline').hidden = rv.outline; if (!rv.outline) { $('#ol-retake').hidden = true; $('#ol-cancel').hidden = true; }
+  $('#rv-next').textContent = state.editing ? 'Update grades' : state.step === 'front' ? 'Next: back of card' : 'See grades';
+  ['#rv-retake', '#rv-reset'].forEach(s => $(s).hidden = rv.outline || (s === '#rv-retake' && state.demo));
   $('#ol-tools').hidden = !rv.outline; $('#bd-tools').hidden = rv.outline;
   $('#rv-help').textContent = rv.outline
     ? 'Line up the green lines with the card\'s straight edges. Each dot goes where two edges meet, just outside the rounded corner.'
@@ -2365,8 +2373,8 @@ function cornerView(s, i) {
   if (rv.tileFreeze && rv.tileFreeze.i === i) return Object.assign({}, rv.tileFreeze.v, { p: rv.olQuad[i] });
   const q = rv.olQuad, p = q[i], st = CV.quadStats(q), ppm = st.pxPerMm;
   const u = a => { const dx = a[0] - p[0], dy = a[1] - p[1], L = Math.hypot(dx, dy); return [dx / L, dy / L]; };
-  const zm = rv.tileZ[i] || 1, u1 = u(q[(i + 1) % 4]), u2 = u(q[(i + 3) % 4]), r = Math.max(14 / zm, 3.2 * ppm / zm);
-  const cx = p[0] + (u1[0] + u2[0]) * 1.4 * ppm / zm, cy = p[1] + (u1[1] + u2[1]) * 1.4 * ppm / zm;
+  const tv = rv.tileV[i], zm = tv.z, u1 = u(q[(i + 1) % 4]), u2 = u(q[(i + 3) % 4]), r = Math.max(14 / zm, 3.2 * ppm / zm);
+  const cx = p[0] + (u1[0] + u2[0]) * 1.4 * ppm / zm + tv.ox, cy = p[1] + (u1[1] + u2[1]) * 1.4 * ppm / zm + tv.oy;
   return { x0: cx - r, y0: cy - r, r, u1, u2, p };
 }
 function drawTiles(s) {
@@ -2374,7 +2382,7 @@ function drawTiles(s) {
     const c = $('#ct-' + i), x = c.getContext('2d'), v = cornerView(s, i), z = c.width / (2 * v.r);
     x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
     drawRegion(x, s.photo, v.x0, v.y0, 2 * v.r, 2 * v.r, 0, 0, c.width, c.height);
-    const P = [(v.p[0] - v.x0) * z, (v.p[1] - v.y0) * z], L = c.width * 1.5;
+    const P = [(v.p[0] - v.x0) * z, (v.p[1] - v.y0) * z], L = c.width * 12;   // long enough to cross the tile even when zoomed far along an edge
     x.strokeStyle = '#3DDC84'; x.lineWidth = 1.5;
     x.beginPath(); x.moveTo(P[0] - v.u1[0] * 20, P[1] - v.u1[1] * 20); x.lineTo(P[0] + v.u1[0] * L, P[1] + v.u1[1] * L);
     x.moveTo(P[0] - v.u2[0] * 20, P[1] - v.u2[1] * 20); x.lineTo(P[0] + v.u2[0] * L, P[1] + v.u2[1] * L); x.stroke();
@@ -2549,20 +2557,35 @@ function bindReview() {
   document.querySelectorAll('#cu-pos button').forEach((b, i) => b.onclick = () => { rv.cuPos = [0.15, 0.5, 0.85][i]; drawReview(); });
   document.querySelectorAll('#cu-line button').forEach(b => b.onclick = () => { rv.sel = b.dataset.t + (rv.sel || 'iL')[1]; drawReview(); });
   document.querySelectorAll('#cu-zoom button[data-d]').forEach(b => b.onclick = () => { rv.cuZoom = stepZoom(rv.cuZoom, +b.dataset.d); drawReview(); });
-  // Corner tiles: tap to pick; on the picked tile, drag moves the corner (finely, at the tile's magnification), pinch zooms 1-2x.
+  // Corner tiles: tap to pick. On the picked tile, one finger moves the corner (finely, at the tile's magnification);
+  // two fingers zoom (1-6x) and pan, like a photo, so you can slide along a straight edge and line it up.
   TILE_ORDER.forEach(i => {
     const cv = $('#ct-' + i), pts = new Map(); let drag = null, pinch = null;
     const dist = () => { const [a, b] = [...pts.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
     cv.addEventListener('pointerdown', e => {
       if (rv.corner !== i) return;                         // first tap just selects (button click)
       pts.set(e.pointerId, [e.clientX, e.clientY]); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
-      if (pts.size === 2) { if (drag && drag.moved) rv.olQuad[i] = drag.orig.slice(); drag = null; rv.tileFreeze = null; pinch = { d0: dist(), z0: rv.tileZ[i] }; drawReview(); return; }
+      if (pts.size === 2) {
+        if (drag && drag.moved) rv.olQuad[i] = drag.orig.slice(); drag = null; rv.tileFreeze = null;
+        const R = cv.getBoundingClientRect(), v = cornerView(cur(), i), [a, b] = [...pts.values()], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        pinch = { d0: dist(), z0: rv.tileV[i].z, P: [v.x0 + (mx - R.left) / R.width * 2 * v.r, v.y0 + (my - R.top) / R.height * 2 * v.r] };
+        drawReview(); return;
+      }
       if (pts.size > 2 || pinch) return;
       const v = cornerView(cur(), i); rv.tileFreeze = { i, v }; drag = { x: e.clientX, y: e.clientY, orig: rv.olQuad[i].slice(), moved: false };
     });
     cv.addEventListener('pointermove', e => {
       if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
-      if (pinch && pts.size === 2) { const z = Math.max(1, Math.min(2, pinch.z0 * dist() / Math.max(1, pinch.d0))); if (Math.abs(z - rv.tileZ[i]) > 0.02) { rv.tileZ[i] = Math.round(z * 10) / 10; drawReview(); } e.preventDefault(); return; }
+      if (pinch && pts.size === 2) {
+        // keep the photo point that was under your fingers under your fingers (zoom + pan together)
+        const tv = rv.tileV[i], R = cv.getBoundingClientRect(), [a, b] = [...pts.values()], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        const z = Math.max(1, Math.min(6, pinch.z0 * dist() / Math.max(1, pinch.d0)));
+        if (z < 1.03) { tv.z = 1; tv.ox = 0; tv.oy = 0; }
+        else { tv.z = z; tv.ox = 0; tv.oy = 0; const v = cornerView(cur(), i);
+          tv.ox = pinch.P[0] - (mx - R.left) / R.width * 2 * v.r + v.r - (v.x0 + v.r);
+          tv.oy = pinch.P[1] - (my - R.top) / R.height * 2 * v.r + v.r - (v.y0 + v.r); }
+        drawReview(); e.preventDefault(); return;
+      }
       if (!drag) return;
       const v = rv.tileFreeze.v, k = 2 * v.r / cv.getBoundingClientRect().width;   // photo px per screen px
       const dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
