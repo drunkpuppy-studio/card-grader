@@ -138,9 +138,11 @@ html, button, .btn, .seg button, .ctile, input, label { touch-action: manipulati
 .ctile canvas { width: 100%; aspect-ratio: 1; display: block; }
 .ctile span { background: var(--card); color: var(--ink); font-size: 12px; padding: 4px; text-align: center; }
 .ctile.on { border-color: var(--volt); box-shadow: 0 0 0 2px var(--volt); }
-.dpad { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: #F6F7F4; }
-.dpad-keys { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 40px); gap: 4px; }
-.dpad-keys .btn { min-height: 40px; padding: 0; }
+.dpad { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; background: #F6F7F4; text-align: center; }
+.dpad-keys { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(2, 44px); gap: 6px; }
+.dpad-keys .btn { min-height: 44px; padding: 0; }
+.ctile.on canvas { touch-action: none; }
+.tile-hint { margin: 2px 0 0; text-align: center; }
 #dp-u { grid-column: 2; grid-row: 1; } #dp-l { grid-column: 1; grid-row: 2; } #dp-d { grid-column: 2; grid-row: 2; } #dp-r { grid-column: 3; grid-row: 2; }
 #cu { width: 100%; height: auto; aspect-ratio: 5/3; border-radius: 10px; background: #111; touch-action: none; display: block; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
@@ -385,7 +387,7 @@ tr.mine td { background: #FFF5D1; }
         <canvas class="loupe" id="loupe" width="256" height="256"></canvas>
       </div>
       <p class="small muted" id="rv-help"></p>
-      <label class="switch small" id="enh-wrap"><input type="checkbox" id="enh" checked> Enhance close-ups (sharper, more contrast; edges stay put)</label>
+      <label class="switch small" id="enh-wrap"><input type="checkbox" id="enh" checked> Enhance close-ups</label>
       <div id="ol-tools" class="tools">
         <div class="ctiles">
           <button class="ctile" id="ctb-0" type="button"><canvas id="ct-0" width="240" height="240"></canvas><span>Top-left</span></button>
@@ -393,8 +395,7 @@ tr.mine td { background: #FFF5D1; }
           <button class="ctile" id="ctb-3" type="button"><canvas id="ct-3" width="240" height="240"></canvas><span>Bottom-left</span></button>
           <button class="ctile" id="ctb-2" type="button"><canvas id="ct-2" width="240" height="240"></canvas><span>Bottom-right</span></button>
         </div>
-        <div class="row" style="justify-content:flex-end;gap:8px"><span class="small muted">Zoom corners</span>
-          <div class="seg small zoomseg" id="tile-zoom"><button type="button" data-d="-1" aria-label="Zoom out">−</button><button type="button" id="tz-val" disabled>1×</button><button type="button" data-d="1" aria-label="Zoom in">+</button></div></div>
+        <p class="small muted tile-hint">Tap a corner, then drag to move it or pinch to zoom.</p>
         <div class="dpad"><span class="small" id="dp-name"></span>
           <div class="dpad-keys"><button class="btn" id="dp-u" type="button" aria-label="Move up">▲</button><button class="btn" id="dp-l" type="button" aria-label="Move left">◀</button><button class="btn" id="dp-d" type="button" aria-label="Move down">▼</button><button class="btn" id="dp-r" type="button" aria-label="Move right">▶</button></div>
         </div>
@@ -2191,7 +2192,7 @@ function alertBox(msg) { $('#nolive-msg').textContent = msg; }
 // Step 2 (borders): straightened card plus PAD px of background. Per side two hairlines: the card's cut edge (green)
 // and the inner edge of the printed border (blue dashed). A zoomed close-up of the selected side lets you place them precisely.
 const PAD = 40;
-const rv = { drag: null, sel: 'iL', outline: false, olQuad: null, olScale: 1, corner: 0, cuPos: 0.5, cu: null, cuFreeze: null, cuZoom: 1, tileZoom: 1 };
+const rv = { drag: null, sel: 'iL', outline: false, olQuad: null, olScale: 1, corner: 0, cuPos: 0.5, cu: null, cuFreeze: null, cuZoom: 1, tileZ: [1, 1, 1, 1], tileFreeze: null };
 const ZOOMS = [1, 1.5, 2, 3, 4, 6];
 const stepZoom = (z, dir) => { const i = ZOOMS.findIndex(v => v >= z - 1e-6); return ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? ZOOMS.length - 1 : i) + dir))]; };
 const SIDE_NAME = { L: 'left', R: 'right', T: 'top', B: 'bottom' };
@@ -2255,8 +2256,8 @@ function setOutlineUi() {
   ['#rv-retake', '#rv-outline', '#rv-reset'].forEach(s => $(s).hidden = rv.outline || (s === '#rv-retake' && state.demo));
   $('#ol-tools').hidden = !rv.outline; $('#bd-tools').hidden = rv.outline;
   $('#rv-help').textContent = rv.outline
-    ? 'Each white dot marks a corner. Card corners are rounded, so the dot goes where the two straight edges would meet, just outside the curve. Make the thin green lines run exactly along the card\'s edges. Drag a dot, or pick a corner below and use the arrows.'
-    : 'Green: the card\'s cut edge. Blue dashed: the inner edge of the printed border. Pick a side, then drag a line in the close-up or use the arrows.';
+    ? 'Line up the green lines with the card\'s straight edges. Each dot goes where two edges meet, just outside the rounded corner.'
+    : 'Green: card edge. Blue: inner edge of the border. Pick a side, then drag in the close-up or tap the arrows.';
   drawReview();
 }
 function drawReview() {
@@ -2361,9 +2362,10 @@ function drawOutline(s) {
   });
 }
 function cornerView(s, i) {
+  if (rv.tileFreeze && rv.tileFreeze.i === i) return Object.assign({}, rv.tileFreeze.v, { p: rv.olQuad[i] });
   const q = rv.olQuad, p = q[i], st = CV.quadStats(q), ppm = st.pxPerMm;
   const u = a => { const dx = a[0] - p[0], dy = a[1] - p[1], L = Math.hypot(dx, dy); return [dx / L, dy / L]; };
-  const zm = rv.tileZoom || 1, u1 = u(q[(i + 1) % 4]), u2 = u(q[(i + 3) % 4]), r = Math.max(14 / zm, 3.2 * ppm / zm);
+  const zm = rv.tileZ[i] || 1, u1 = u(q[(i + 1) % 4]), u2 = u(q[(i + 3) % 4]), r = Math.max(14 / zm, 3.2 * ppm / zm);
   const cx = p[0] + (u1[0] + u2[0]) * 1.4 * ppm / zm, cy = p[1] + (u1[1] + u2[1]) * 1.4 * ppm / zm;
   return { x0: cx - r, y0: cy - r, r, u1, u2, p };
 }
@@ -2380,8 +2382,7 @@ function drawTiles(s) {
     $('#ctb-' + i).classList.toggle('on', rv.corner === i);
   });
   const ppm = CV.quadStats(rv.olQuad).pxPerMm;
-  $('#dp-name').textContent = `${CORNER_NAME[rv.corner]} corner · each tap moves ${(1 / ppm).toFixed(2)} mm`;
-  $('#tz-val').textContent = fmtZoom(rv.tileZoom);
+  $('#dp-name').textContent = `${CORNER_NAME[rv.corner]} · ${(1 / ppm).toFixed(2)} mm per tap`;
 }
 const fmtZoom = z => (z % 1 ? z.toFixed(1) : z) + '×';
 function nudgeCorner(dx, dy) { const p = rv.olQuad[rv.corner]; p[0] += dx; p[1] += dy; drawReview(); }
@@ -2548,7 +2549,29 @@ function bindReview() {
   document.querySelectorAll('#cu-pos button').forEach((b, i) => b.onclick = () => { rv.cuPos = [0.15, 0.5, 0.85][i]; drawReview(); });
   document.querySelectorAll('#cu-line button').forEach(b => b.onclick = () => { rv.sel = b.dataset.t + (rv.sel || 'iL')[1]; drawReview(); });
   document.querySelectorAll('#cu-zoom button[data-d]').forEach(b => b.onclick = () => { rv.cuZoom = stepZoom(rv.cuZoom, +b.dataset.d); drawReview(); });
-  document.querySelectorAll('#tile-zoom button[data-d]').forEach(b => b.onclick = () => { rv.tileZoom = stepZoom(rv.tileZoom, +b.dataset.d); drawReview(); });
+  // Corner tiles: tap to pick; on the picked tile, drag moves the corner (finely, at the tile's magnification), pinch zooms 1-2x.
+  TILE_ORDER.forEach(i => {
+    const cv = $('#ct-' + i), pts = new Map(); let drag = null, pinch = null;
+    const dist = () => { const [a, b] = [...pts.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
+    cv.addEventListener('pointerdown', e => {
+      if (rv.corner !== i) return;                         // first tap just selects (button click)
+      pts.set(e.pointerId, [e.clientX, e.clientY]); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+      if (pts.size === 2) { if (drag && drag.moved) rv.olQuad[i] = drag.orig.slice(); drag = null; rv.tileFreeze = null; pinch = { d0: dist(), z0: rv.tileZ[i] }; drawReview(); return; }
+      if (pts.size > 2 || pinch) return;
+      const v = cornerView(cur(), i); rv.tileFreeze = { i, v }; drag = { x: e.clientX, y: e.clientY, orig: rv.olQuad[i].slice(), moved: false };
+    });
+    cv.addEventListener('pointermove', e => {
+      if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pinch && pts.size === 2) { const z = Math.max(1, Math.min(2, pinch.z0 * dist() / Math.max(1, pinch.d0))); if (Math.abs(z - rv.tileZ[i]) > 0.02) { rv.tileZ[i] = Math.round(z * 10) / 10; drawReview(); } e.preventDefault(); return; }
+      if (!drag) return;
+      const v = rv.tileFreeze.v, k = 2 * v.r / cv.getBoundingClientRect().width;   // photo px per screen px
+      const dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 3) return;
+      drag.moved = true; rv.olQuad[i] = [drag.orig[0] + dx, drag.orig[1] + dy]; drawReview(); e.preventDefault();
+    });
+    const end = e => { pts.delete(e.pointerId); if (pinch) { if (!pts.size) pinch = null; return; } if (drag) { drag = null; rv.tileFreeze = null; drawReview(); } };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  });
   $('#enh').checked = ENH;
   $('#enh').onchange = e => { ENH = e.target.checked; try { localStorage.setItem('pregrade.enhance', ENH ? '1' : '0'); } catch (er) {} for (const k of ['front', 'back']) { const sd = state.sides[k]; if (sd) sd.cuCache = null; } drawReview(); };
   TILE_ORDER.forEach(i => $('#ctb-' + i).onclick = () => { rv.corner = i; drawReview(); });
