@@ -2018,7 +2018,7 @@ function frame(t) {
     x.beginPath(); cam.det.quad.forEach((p, i) => i ? x.lineTo(p[0] * k, p[1] * k) : x.moveTo(p[0] * k, p[1] * k)); x.closePath(); x.stroke();
   }
   if (allOk && $('#auto').checked) {
-    const p = Math.min(1, (performance.now() - cam.okSince) / 900);
+    const p = Math.min(1, (performance.now() - cam.okSince) / HOLD_MS);
     x.strokeStyle = '#3DDC84'; x.lineWidth = 6 * dpr; x.beginPath(); x.arc(W / 2, H / 2, 26 * dpr, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); x.stroke();
   }
   if (t - cam.lastA > 130 && !cam.busy) { cam.lastA = t; analyzeLive(); }
@@ -2102,9 +2102,9 @@ function analyzeLive() {
     const fx = an.f.getContext('2d', { willReadFrequently: true }), vx = c.sx + (g.x + g.w / 2) / c.W * c.sw - 128, vy = c.sy + (g.y + g.h * 0.3) / c.H * c.sh - 128;
     fx.drawImage(v, vx, vy, 256, 256, 0, 0, 256, 256);
     const lv = lapVar(fx.getImageData(0, 0, 256, 256)), now = performance.now();
-    cam.lap.push([now, lv]); cam.lap = cam.lap.filter(e => now - e[0] < 5000);
+    cam.lap.push([now, lv]); cam.lap = cam.lap.filter(e => now - e[0] < 2500);   // compare with the last 2.5 s only
     const lmax = Math.max(...cam.lap.map(e => e[1]));
-    const focus = lv > 12 && lv >= 0.6 * lmax ? 'ok' : 'bad';
+    const focus = lv > 12 && lv >= 0.5 * lmax ? 'ok' : 'bad';
     const steady = diff < 5 ? 'ok' : diff < 9 ? 'warn' : 'bad';
     if (!say && focus !== 'ok') say = found && framing !== 'small' && cam.zoom === 1 ? 'Too close to focus? Step back and switch to 2×' : 'Hold still while the camera focuses';
     if (!say && steady !== 'ok') say = 'Hold steady';
@@ -2115,22 +2115,24 @@ function analyzeLive() {
     const pill = (name, st) => `<span class="pill ${st === 'ok' ? 'ok' : st === 'warn' ? 'warn' : 'bad'}">${name}</span>`;
     $('#checks').innerHTML = pill('Card found', found ? 'ok' : 'bad') + pill('Light', found ? light : 'warn') + pill('Glare', found ? glare : 'warn') + pill('Framing', framing === 'ok' ? 'ok' : 'bad') + pill('Angle', straight !== 'ok' ? 'bad' : tiltHint ? 'warn' : 'ok') + pill('Even light', found ? shade : 'warn') + pill('Focus', focus) + pill('Steady', steady) + (lv2 ? pill('Phone level', lv2) : '');
     $('#say').textContent = good ? ($('#auto').checked ? 'Hold it… capturing' : 'Looks good. Tap the shutter') + (tiltHint ? ' (slight angle is fine, it gets straightened)' : '') : say;
-    if (good) { if (!cam.okSince) cam.okSince = now; if ($('#auto').checked && now - cam.okSince > 900) captureLive(); }
-    else cam.okSince = 0;
+    // Hold for HOLD_MS. One stray bad reading (a blink of glare, focus hunting) doesn't restart the count; 300 ms of bad does.
+    if (good) { cam.badSince = 0; if (!cam.okSince) cam.okSince = now; if ($('#auto').checked && now - cam.okSince > HOLD_MS) captureLive(); }
+    else if (cam.okSince) { if (!cam.badSince) cam.badSince = now; if (now - cam.badSince > 300) { cam.okSince = 0; cam.badSince = 0; } }
   } finally { cam.busy = false; }
 }
+const HOLD_MS = 500;
 async function captureLive() {
   const v = cam.video, c = cam.crop; if (!v || !c || cam.capturing) return;
   cam.capturing = true; const det = cam.det; cam.okSince = 0;
   $('#say').textContent = 'Capturing…';
-  // Burst of four frames ~90 ms apart. The sharpest is the reference; the others are lined up on it and averaged in,
+  // Burst of four frames ~70 ms apart. The sharpest is the reference; the others are lined up on it and averaged in,
   // which cuts sensor noise and makes edges cleaner using only real pixels (no guessing).
   const shots = [];
   for (let i = 0; i < 4; i++) {
     const L = drawToImg(v, v.videoWidth, v.videoHeight, c), cx = L.canvas.getContext('2d');
     const w = Math.min(320, L.canvas.width), h = Math.min(320, L.canvas.height);
     shots.push({ L, sharp: lapVar(cx.getImageData((L.canvas.width - w) >> 1, (L.canvas.height - h) >> 1, w, h)) });
-    if (i < 3) await new Promise(r => setTimeout(r, 90));
+    if (i < 3) await new Promise(r => setTimeout(r, 70));
   }
   shots.sort((a, b) => b.sharp - a.sharp);
   const loaded = stackFrames(shots);
