@@ -214,6 +214,9 @@ body.flow .savebar { bottom: calc(12px + env(safe-area-inset-bottom)); }
 @keyframes sb-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .border-call { border: 1.5px solid #E9B949; background: #FFF8E6; }
 .border-call b { font-size: 17px; }
+.gcall { border-radius: 12px; padding: 12px; margin: 6px 0 12px; border: 1.5px solid var(--line); }
+.gcall.ok { background: #EAF6EF; border-color: #7CC39B; } .gcall.bad { background: #FBEDEC; border-color: #E3A39C; } .gcall.warn { background: #FFF8E6; border-color: #E9B949; }
+.gcall > b { font-size: 18px; }
 .saved-state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #1F7A4D; font-weight: 600; }
 .saved-state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #2FA36B; }
 .dwrap { position: relative; width: 104px; height: 104px; }
@@ -311,6 +314,11 @@ tr.mine td { background: #FFF5D1; }
     <div class="panel">
       <h2>Prices</h2>
       <p class="small muted">Free: raw prices from TCGdex (TCGplayer US$, Cardmarket €), and an estimated PSA 9 and PSA 10 value worked out from the raw price.</p>
+      <div class="row" style="gap:8px;flex-wrap:nowrap;margin:6px 0">
+        <div class="field" style="flex:1;margin:0"><label for="fee-grade">Grading fee per card (US$)</label><input id="fee-grade" inputmode="decimal"></div>
+        <div class="field" style="flex:1;margin:0"><label for="fee-other">Other costs per card (US$)</label><input id="fee-other" inputmode="decimal" placeholder="shipping, insurance"></div>
+      </div>
+      <p class="small muted" id="fee-note"></p>
       <details><summary class="small">Optional: real graded prices (paid PriceCharting key)</summary>
         <div class="field" style="margin-top:8px"><label for="pc-token">PriceCharting API key</label><input id="pc-token" autocomplete="off" spellcheck="false" placeholder="Paste your key"></div>
         <div class="row"><button class="btn" id="pc-save" type="button">Save key</button><span class="small muted" id="pc-status"></span></div>
@@ -1814,6 +1822,7 @@ function renderPrice() {
       h += `<h3>Raw (ungraded)</h3>` + (rows.length ? `<div class="tablewrap"><table><tbody>${rows.map(x => `<tr><td>${esc(x[0])}</td><td class="mono">${x[1]}</td><td class="small muted">${x[2]}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">No raw price listed for this card.</p>');
       h += `<p class="small muted">Source: TCGdex. TCGplayer as of ${esc(fmtDate(p.tcgplayer.updated) || 'n/a')}${p.cardmarket ? `, Cardmarket as of ${esc(fmtDate(p.cardmarket.updated))}` : ''}. Fetched ${esc(fmtDate(p.fetchedAt))}.</p>`;
     }
+    h += '<h3>Grade or keep raw?</h3>' + (gradeCall(p) || '<p class="small muted">Needs a raw price to work out.</p>');
     h += '<h3>By grade</h3>';
     if (p.pc) {
       const est = state.est || compute(), mine = {};
@@ -1827,11 +1836,53 @@ function renderPrice() {
       if (p.pcError) h += `<p class="small">${esc(p.pcError)}</p>`;
       h += `<a class="btn block" href="${esc(pcLink(r))}" target="_blank" rel="noopener">Check real graded sales on PriceCharting ↗</a>`;
     }
+    h += `<p class="small" style="margin:12px 0 6px">See what it really sold for on eBay:</p><div class="row" style="gap:8px">${[['Raw', ''], ['PSA 9', 'PSA 9'], ['PSA 10', 'PSA 10']].map(([l, q]) => `<a class="btn" style="flex:1" href="${esc(ebayLink(r, q))}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}</div>`;
   }
   body.innerHTML = h;
   const ch = $('#ps-change'); if (ch) ch.onclick = () => { state.ref = null; state.price = null; markDirty(); renderPrice(); renderCardHead(); };
   const ld = $('#ps-load'); if (ld) ld.onclick = loadPrices;
 }
+
+/* ---------- grade or keep raw ---------- */
+// PSA Value tier, the cheapest PSA service open now: US$39.99 per card, up to US$500 declared value
+// (reopened 29 Oct 2026; psacard.com and icv2.com, checked 24 Nov 2026). Editable in Settings.
+const FEE = { psa: 39.99, checked: '24 Nov 2026', cap: 500 };
+function fees() {
+  let g = FEE.psa, o = 0;
+  try { const a = parseFloat(localStorage.getItem('pregrade.fee.grade')), b = parseFloat(localStorage.getItem('pregrade.fee.other')); if (a >= 0) g = a; if (b >= 0) o = b; } catch (e) {}
+  return { grade: g, other: o, total: g + o };
+}
+// Value range [low, high] in US$ for a PSA grade, from PriceCharting when you have a key, else the raw-price multipliers.
+function valueAt(p, g) {
+  const raw = p.rawUsd;
+  if (p.pc) { const k = { 10: 'manual-only', 9: 'graded', 8: 'new', 7: 'cib' }[g]; const v = k && p.pc.prices[k]; if (v) return [v, v, 'PriceCharting']; }
+  if (!raw) return null;
+  const vint = isVintage(p.setId);
+  if (g >= 10) return vint ? [raw * EST.v10[0], raw * EST.v10[1], 'estimate'] : [raw * EST.p10typ[0], raw * EST.p10typ[1], 'estimate'];
+  if (g >= 9) return [raw * EST.p9[0], raw * EST.p9[1], 'estimate'];
+  return [raw * 0.6, raw, 'usually no more than raw'];   // below 9 modern slabs rarely beat a raw copy
+}
+function gradeCall(p) {
+  const raw = p.rawUsd; if (!raw) return '';
+  const est = state.est || compute(), g = est.results[0].grade, bl = borderline(), F = fees();
+  const lo = bl ? bl.psa.worst.grade : g, hi = bl ? bl.psa.best.grade : g, vLo = valueAt(p, lo), vHi = valueAt(p, hi);
+  if (!vLo || !vHi) return '';
+  const pLo = vLo[0] - raw - F.total, pHi = vHi[1] - raw - F.total;
+  const verdict = pHi < 0 ? ['Keep it raw', 'bad'] : pLo > 0 ? ['Worth grading', 'ok'] : ['Your call', 'warn'];
+  const gl = lo === hi ? `PSA ${GRADE.fmt(g)}` : `PSA ${GRADE.fmt(lo)}–${GRADE.fmt(hi)}`;
+  const why = pHi < 0 ? `At ${gl}, a slab is worth about ${money(vHi[1])} at best. That's less than the ${money(raw)} raw price plus ${money(F.total)} in costs.`
+    : pLo > 0 ? `At ${gl}, a slab should be worth about ${money(vLo[0])}–${money(vHi[1])}, more than ${money(raw)} raw plus ${money(F.total)} in costs.`
+    : `At ${gl}, it could go either way: anywhere from ${money(pLo)} to +${money(pHi)} after costs.`;
+  const be = raw + F.total;
+  const rows = [10, 9, 8].map(k => { const v = valueAt(p, k); if (!v) return ''; const a = v[0] - raw - F.total, b = v[1] - raw - F.total, mine = k >= lo && k <= hi;
+    const net = x => `${x >= 0 ? '+' : '−'}${money(Math.abs(x))}`;
+    const capped = v[2] === 'usually no more than raw';
+    return `<tr class="${mine ? 'mine' : ''}"><td class="co">PSA ${k}</td><td class="mono">${capped ? 'up to ' + money(v[1]) : v[0] === v[1] ? money(v[0]) : money(v[0]) + '–' + money(v[1])}</td><td class="mono">${capped ? net(b) + ' or worse' : a === b ? net(a) : net(a) + ' to ' + net(b)}</td></tr>`; }).join('');
+  return `<div class="gcall ${verdict[1]}"><b>${verdict[0]}</b><p class="small" style="margin:4px 0 8px">${esc(why)} A slab has to sell for more than <b>${money(be)}</b> to beat keeping it raw.</p>
+    <div class="tablewrap"><table><thead><tr><th>If it gets</th><th>Slab worth</th><th>vs keeping raw</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="small muted">Costs: ${money(F.grade)} grading + ${money(F.other)} other per card (change in Settings). PSA Value tier is ${money(FEE.psa)} for cards up to ${money(FEE.cap)}, checked ${FEE.checked}. Your highlighted grade is this app's estimate; graders are often stricter.</p></div>`;
+}
+function ebayLink(r, q) { return 'https://www.ebay.com/sch/i.html?LH_Sold=1&LH_Complete=1&_nkw=' + encodeURIComponent(`${r.name} ${r.number || ''}${r.total ? '/' + r.total : ''} ${q}`.replace(/\s+/g, ' ').trim()); }
 
 /* Free estimate of graded value from the raw price, using published raw-to-graded multipliers (checked 22 Nov 2026):
    modern PSA 10 ≈ 2–5× raw, typical 3.4–4.3×; PSA 9 ≈ 1.0–1.1× raw; vintage PSA 10 5–20× and often far more. */
@@ -1856,6 +1907,10 @@ function estimateBlock(p) {
 async function showPrefs() {
   show('prefs');
   $('#pc-token').value = pcToken(); $('#pc-status').textContent = pcToken() ? 'Key saved on this phone' : '';
+  { const F = fees(); $('#fee-grade').value = F.grade.toFixed(2); $('#fee-other').value = F.other ? F.other.toFixed(2) : '';
+    $('#fee-note').textContent = `Used for "Grade or keep raw?". Default is PSA's Value tier, ${money(FEE.psa)} per card for cards up to ${money(FEE.cap)} (checked ${FEE.checked}). Add shipping both ways, insurance and any submission-service fee as other costs.`;
+    const save = () => { try { const a = parseFloat($('#fee-grade').value), b = parseFloat($('#fee-other').value); localStorage.setItem('pregrade.fee.grade', a >= 0 ? a : FEE.psa); localStorage.setItem('pregrade.fee.other', b >= 0 ? b : 0); } catch (e) {} };
+    $('#fee-grade').onchange = save; $('#fee-other').onchange = save; }
   const all = await DB.all(); let est = '';
   try { const e = await navigator.storage.estimate(); est = ` · ${(e.usage / 1048576).toFixed(1)} MB used`; } catch (e) {}
   $('#data-status').textContent = `${all.length} card${all.length === 1 ? '' : 's'} saved on this phone${est}. Photos and lines stay here and are not uploaded.` + (DB.db === null ? ' This browser won\'t keep them after you close the page.' : '');
