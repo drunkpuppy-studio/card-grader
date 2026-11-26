@@ -1700,7 +1700,7 @@ async function openSaved(id) {
   try {
     const front = await loadSide(rec.sides.front), back = rec.sides.back ? await loadSide(rec.sides.back) : null;
     Object.assign(state, { sides: { front, back }, flags: rec.flags || {}, ai: rec.ai || null, aiPoints: rec.aiPoints || null, useAi: !!rec.useAi, demo: false, editing: false,
-      savedId: rec.id, created: rec.created, updated: rec.updated || rec.created, name: rec.name || '', ref: rec.ref || null, price: rec.price || null, dirty: false, chSide: 'front', idTried: null, idGuess: null });
+      savedId: rec.id, created: rec.created, updated: rec.updated || rec.created, name: rec.name || '', ref: rec.ref || null, price: rec.price || null, dirty: false, chSide: 'front', idTried: null, idGuess: null, idChoices: null });
   } catch (e) { busy(''); toast('Couldn\'t open that card'); return; }
   busy(''); openResults();
 }
@@ -1767,33 +1767,31 @@ async function ocr() {
   return ocrWorker;
 }
 // A band of the straightened card, re-sampled from the original photo at full resolution, greyed and contrast-stretched.
-function cardBand(s, fx0, fy0, fx1, fy1, f) {
+// A band of the straightened card, re-sampled from the original photo at full resolution.
+// mode 'gray': contrast-stretched grey; 'dark': keep only dark ink (black names on holo); 'light': keep only white ink (white numbers).
+function cardBand(s, fx0, fy0, fx1, fy1, f, mode, th) {
   const Hm = canonToPhoto(s);
   const x0 = fx0 * CV.W, y0 = fy0 * CV.H, x1 = fx1 * CV.W, y1 = fy1 * CV.H, ow = Math.round((x1 - x0) * f), oh = Math.round((y1 - y0) * f);
   const q = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(p => CV.applyH(Hm, p[0], p[1]));
   const im = CV.warp(s.img, q, ow, oh), d = im.data, n = ow * oh, v = new Float32Array(n);
   for (let i = 0; i < n; i++) v[i] = 0.3 * d[i * 4] + 0.59 * d[i * 4 + 1] + 0.11 * d[i * 4 + 2];
   const srt = Array.from(v).sort((a, b) => a - b), lo = srt[Math.floor(n * 0.02)], hi = srt[Math.floor(n * 0.98)];
-  const out = new ImageData(ow, oh); for (let i = 0; i < n; i++) { const t = (v[i] - lo) * 255 / Math.max(1, hi - lo); out.data[i * 4] = out.data[i * 4 + 1] = out.data[i * 4 + 2] = t; out.data[i * 4 + 3] = 255; }
+  const out = new ImageData(ow, oh);
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const t = mode === 'dark' ? (mx < th ? 0 : 255) : mode === 'light' ? (mn > th && mx - mn < 60 ? 0 : 255) : (v[i] - lo) * 255 / Math.max(1, hi - lo);
+    out.data[i * 4] = out.data[i * 4 + 1] = out.data[i * 4 + 2] = t; out.data[i * 4 + 3] = 255;
+  }
   const c = canvasOf(ow, oh); c.getContext('2d').putImageData(out, 0, 0); return c;
-}
-function otsu(c) {
-  const x = c.getContext('2d'), d = x.getImageData(0, 0, c.width, c.height), h = new Array(256).fill(0), N = d.data.length / 4;
-  for (let i = 0; i < d.data.length; i += 4) h[d.data[i] | 0]++;
-  let sum = 0; for (let i = 0; i < 256; i++) sum += i * h[i];
-  let sB = 0, wB = 0, best = 0, th = 128; for (let t = 0; t < 256; t++) { wB += h[t]; if (!wB) continue; const wF = N - wB; if (!wF) break; sB += t * h[t]; const b = wB * wF * (sB / wB - (sum - sB) / wF) ** 2; if (b > best) { best = b; th = t; } }
-  const o = canvasOf(c.width, c.height), ox = o.getContext('2d'), e = ox.createImageData(c.width, c.height);
-  for (let i = 0; i < d.data.length; i += 4) { const v = d.data[i] > th ? 255 : 0; e.data[i] = e.data[i + 1] = e.data[i + 2] = v; e.data[i + 3] = 255; }
-  ox.putImageData(e, 0, 0); return o;
 }
 const STOP = /^(item|trainer|basic|stage|stage1|stage2|supporter|stadium|tool|pokemon|pok[eé]mon|tool|energy|hp|evolves|from|ex|v|vmax|vstar|gx|ace|spec)$/i;
 function nameGuesses(text) {
-  const out = [];
-  for (const line of text.split('\n')) {
-    const words = line.replace(/[^A-Za-zÀ-ÿ'’.\- ]/g, ' ').split(/\s+/).filter(w => w.length >= 2 && !STOP.test(w));
-    if (!words.length) continue;
-    const g = words.join(' ').replace(/\s+/g, ' ').trim(); if (g.length >= 3) out.push(g);
-    if (words.length > 1) out.push(words.slice(0, 2).join(' '), words[0]);
+  // Card names are capitalised words ("Raikou", "Ultra Ball", "Gengar ex"); OCR junk mostly isn't.
+  const out = [], t = text.replace(/[@€©]X\b/g, ' ex').replace(/\b([A-Z][a-z]{1,})\s([a-z]{2,})\b/g, '$1$2');   // "Rai kou" -> "Raikou"
+  for (const m of t.matchAll(/[A-Z][a-zà-ÿ'’.\-]{2,}(?:\s+[A-Z][a-zà-ÿ'’.\-]{2,})?(?:\s+(?:ex|EX|V|VMAX|VSTAR|GX))?/g)) {
+    const g = m[0].trim(), first = g.split(/\s+/)[0];
+    if (STOP.test(first) || /^(Evolves|Item|Trainer|Basic|Stage|Supporter|Stadium|Ability|Illus)/i.test(first)) continue;
+    out.push(g.replace(/\s+/g, ' ')); if (g.includes(' ')) out.push(first);
   }
   return [...new Set(out)].slice(0, 6);
 }
@@ -1801,39 +1799,66 @@ function editDist(a, b) { a = a.toLowerCase(); b = b.toLowerCase(); const d = Ar
   for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
 async function readCard(s) {
   const w = await ocr();
-  const name = (await w.recognize(cardBand(s, 0.03, 0.015, 0.82, 0.13, 2))).data.text;
-  let num = null;
-  // Collector number "041/182": bottom-left on modern cards, bottom-right on older ones. Plain grey first, then a black-and-white pass that reads digits only.
-  const grab = t => { const m = t.replace(/[Oo]/g, '0').replace(/[Il|]/g, '1').match(/(\d{1,3})\s*\/\s*(\d{2,3})/); return m && +m[2] >= 20 && +m[1] <= +m[2] + 80 ? { n: m[1], total: m[2] } : null; };
-  outer: for (const b of [[0.02, 0.9, 0.58, 0.99], [0.42, 0.9, 0.98, 0.99]]) {
-    const band = cardBand(s, ...b, 3);
-    num = grab((await w.recognize(band)).data.text); if (num) break;
-    await w.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '0123456789/' });
-    try { num = grab((await w.recognize(otsu(band))).data.text); } finally { await w.setParameters({ tessedit_pageseg_mode: '6', tessedit_char_whitelist: '' }); }
-    if (num) break outer;
+  // Name: black ink first (beats holo sparkle), then plain grey.
+  let names = [], raw = '';
+  for (const [mode, th] of [['gray'], ['dark', 95], ['dark', 125]]) {
+    const t = (await w.recognize(cardBand(s, 0.03, 0.015, 0.82, 0.13, 2, mode, th))).data.text; raw += t + '\n';
+    names = [...new Set(names.concat(nameGuesses(t)))];
   }
-  return { names: nameGuesses(name), num, raw: name };
+  names.sort((a, b) => b.replace(/ ex$/, '').length - a.replace(/ ex$/, '').length);   // longer, fuller names first
+  // Collector number "041/182": strict "a/b" first; then a looser read where the slash came out as ) 7 | or l,
+  // which only counts for the usual three-digit form (e.g. 090/128). Several ink modes and bands, stop at the first good read.
+  const strict = t => { const m = t.replace(/[Oo]/g, '0').match(/(?<!\d)(\d{1,3})\s*\/\s*(\d{2,3})(?!\d)/); return m && +m[2] >= 20 && +m[1] <= +m[2] + 80 ? { n: m[1], total: m[2] } : null; };
+  const loose = t => { const m = t.replace(/[Oo]/g, '0').match(/(?<!\d)(\d{3})\s*[)\]|7Il1,]\s*(\d{3})(?!\d)/); return m && +m[2] >= 20 && +m[1] <= +m[2] + 80 ? { n: m[1], total: m[2] } : null; };
+  const tries = [[[0.02, 0.9, 0.58, 0.99], 3, 'gray'], [[0.02, 0.9, 0.58, 0.99], 3, 'dark', 120], [[0.12, 0.925, 0.36, 0.968], 5, 'light', 175],
+    [[0.02, 0.92, 0.5, 0.98], 4, 'light', 150], [[0.42, 0.9, 0.98, 0.99], 3, 'gray'], [[0.12, 0.925, 0.36, 0.968], 5, 'light', 200]];
+  let num = null; const votes = {};
+  await w.setParameters({ tessedit_pageseg_mode: '6' });
+  for (const [b, f, mode, th] of tries) {
+    await w.setParameters({ tessedit_pageseg_mode: b[3] - b[1] < 0.05 ? '7' : '6' });
+    const t = (await w.recognize(cardBand(s, ...b, f, mode, th))).data.text;
+    const a = strict(t); if (a) { num = a; break; }
+    const l = loose(t); if (l) { const k = l.n + '/' + l.total; votes[k] = (votes[k] || 0) + 1; if (votes[k] >= 1 && !num) num = l; }
+  }
+  await w.setParameters({ tessedit_pageseg_mode: '6' });
+  return { names, num, raw };
 }
 // Find the TCGdex card: name + number first, then number alone with the closest name. The set's printed total breaks ties.
 async function identify(found) {
   const strip = x => String(x).replace(/^0+/, '');
+  // Every printing whose set total matches. Reprints (e.g. 30th Celebration Classic Collection) keep the original
+  // name, number and total, so more than one can match: then the person picks.
   const pickByTotal = async cands => {
-    if (!found.num || cands.length === 1) return cands[0];
-    for (const c of cands.slice(0, 5)) { try { const d = await fetchJson('https://api.tcgdex.net/v2/en/cards/' + encodeURIComponent(c.id)); if (d.set && d.set.cardCount && String(d.set.cardCount.official) === strip(found.num.total)) return c; } catch (e) {} }
-    return null;
+    const ok = [];
+    for (const c of cands.slice(0, 8)) {
+      try { const d = await fetchJson('https://api.tcgdex.net/v2/en/cards/' + encodeURIComponent(c.id)); c.setName = d.set && d.set.name;
+        if (!found.num || (d.set && d.set.cardCount && (String(d.set.cardCount.official) === strip(found.num.total) || String(d.set.cardCount.total) === strip(found.num.total)))) ok.push(c); } catch (e) {}
+    }
+    if (ok.length > 1) return { many: ok };
+    return ok[0] || (cands.length === 1 && !found.num ? cands[0] : null);
   };
   for (const nm of found.names) {
     let list = []; try { list = await searchCards(nm, found.num ? found.num.n : ''); } catch (e) { continue; }
     if (!list.length) continue;
     if (!found.hit) found.hit = nm;   // first guess that is a real card name
-    if (found.num) { const same = list.filter(c => strip(c.localId) === strip(found.num.n)); if (same.length) { const c = await pickByTotal(same); if (c) return c; } }
+    if (found.num) {
+      const same = list.filter(c => strip(c.localId) === strip(found.num.n) && c.name.toLowerCase().startsWith(nm.toLowerCase().replace(/ ex$/, '')));
+      if (same.length === 1) return same[0];
+      if (same.length > 1) {
+        // Same name and number in more than one set: usually a reprint with a stamp (Celebrations, 30th Celebration
+        // Classic Collection) that keeps the original number and total. A photo can't reliably tell them apart: ask.
+        for (const c of same.slice(0, 8)) { try { const d = await fetchJson('https://api.tcgdex.net/v2/en/cards/' + encodeURIComponent(c.id)); c.setName = d.set && d.set.name; c.okTotal = !!(d.set && d.set.cardCount && String(d.set.cardCount.official) === strip(found.num.total)); } catch (e) {} }
+        return { many: same.slice(0, 8).sort((a, b) => (b.okTotal ? 1 : 0) - (a.okTotal ? 1 : 0)) };
+      }
+    }
     else if (list.length === 1) return list[0];
   }
   if (found.num) {
     let list = []; for (const v of [found.num.n, strip(found.num.n)]) { try { list = await fetchJson('https://api.tcgdex.net/v2/en/cards?localId=' + encodeURIComponent(v)); } catch (e) {} if (Array.isArray(list) && list.length) break; }
     if (Array.isArray(list) && found.names.length) {
-      const scored = list.map(c => ({ c, d: Math.min(...found.names.map(nm => editDist(nm, c.name))) })).filter(x => x.d <= 2).sort((a, b) => a.d - b.d);
-      const c = await pickByTotal(scored.map(x => x.c)); if (c) return c;
+      const near = (nm, cn) => { const a = nm.toLowerCase(), b = cn.toLowerCase(); return Math.min(editDist(a, b), a.length >= 3 && b.startsWith(a) ? 1 : 9, b.length >= 3 && a.startsWith(b) ? 1 : 9); };
+      const scored = list.map(c => ({ c, d: Math.min(...found.names.map(nm => near(nm, c.name))) })).filter(x => x.d <= 2).sort((a, b) => a.d - b.d);
+      const c = await pickByTotal(scored.map(x => x.c).slice(0, 8)); if (c) return c;
     }
   }
   return null;
@@ -1843,6 +1868,7 @@ async function autoIdentify() {
   state.idTried = 'busy'; renderPrice();
   let found = null, card = null;
   try { found = await readCard(s); card = await identify(found); } catch (e) {}
+  if (card && card.many) { state.idTried = 'multi'; state.idGuess = found; state.idChoices = card.many; renderPrice(); return; }
   state.idTried = card ? 'ok' : 'none'; state.idGuess = found;
   if (card && !state.ref) {
     state.ref = { src: 'tcgdex', id: card.id, name: card.name, number: card.localId, image: card.image, auto: true };
@@ -1889,6 +1915,15 @@ function renderPrice() {
   if (state.demo) { body.innerHTML = '<p class="small muted">Prices appear here for your own cards once you link them to the card they are.</p>'; return; }
   if (!r) {
     const g = state.idGuess, gName = (g && (g.hit || g.names[0])) || state.name || '', gNum = g && g.num ? g.num.n : '';
+    if (state.idTried === 'multi' && state.idChoices) {
+      const L = state.idChoices, c0 = L[0];
+      body.innerHTML = `<p class="small"><b>${esc(c0.name)} ${esc(c0.localId)}</b> was printed more than once with the same number, for example as a reprint with an anniversary stamp. Which one is yours?</p>
+        <div class="pick-grid">${L.map((c, i) => `<button class="pick" type="button" data-i="${i}"><img alt="" loading="lazy" src="${esc(c.image ? c.image + '/low.webp' : '')}" onerror="this.style.visibility='hidden'"><span>${esc(c.setName || String(c.id).split('-')[0])}</span><span class="mono muted">${esc(c.localId)}</span></button>`).join('')}</div>
+        <button class="btn ghost small" id="ps-other" type="button">None of these</button>`;
+      body.querySelectorAll('.pick').forEach(b => b.onclick = () => { const c = L[+b.dataset.i]; state.ref = { src: 'tcgdex', id: c.id, name: c.name, number: c.localId, image: c.image }; if (!state.name) { state.name = c.name; $('#cardname').value = c.name; } state.idTried = 'ok'; state.price = null; markDirty(); renderCardHead(); loadPrices(); });
+      $('#ps-other').onclick = () => { state.idTried = 'none'; renderPrice(); };
+      return;
+    }
     body.innerHTML = (state.idTried === 'busy' ? '<p class="small muted"><span class="spin"></span> Reading the card name and number from the photo…</p>'
       : state.idTried === 'none' ? '<p class="small">Couldn\'t match this card from the photo. Check the name and number below, then tap Find card.</p>'
       : '<p class="small muted">Link this to the card it is to see prices.</p>') + `
@@ -1907,7 +1942,7 @@ function renderPrice() {
     };
     return;
   }
-  let h = `<div class="refrow"><img alt="" src="${esc(r.image ? r.image + '/low.webp' : '')}" onerror="this.style.display='none'"><div><b>${esc(r.name)}</b><div class="small muted">${esc(r.setName || '')} ${esc(r.number || '')}${r.total ? '/' + esc(r.total) : ''}</div><button class="btn ghost small" id="ps-change" type="button">${r.auto ? 'Not this card? Change' : 'Change card'}</button></div></div>`;
+  let h = `<div class="refrow"><img alt="" src="${esc(r.image ? r.image + '/low.webp' : '')}" onerror="this.style.display='none'"><div><b>${esc(r.name)}</b><div class="small muted">${esc(r.setName || '')} ${esc(r.number || '')}${r.total ? '/' + esc(r.total) : ''}</div><button class="btn ghost small" id="ps-change" type="button">${r.auto ? 'Not this card? Change' : 'Change card'}</button>${r.auto ? '<div class="small muted">Picked from the photo. If yours has an anniversary stamp or is a reprint, tap Change.</div>' : ''}</div></div>`;
   if (state.priceLoading) h += '<p class="small muted"><span class="spin"></span> Getting prices…</p>';
   else if (!p) h += '<button class="btn block" id="ps-load" type="button">Get prices</button>';
   else {
@@ -3069,7 +3104,7 @@ function renderSources() {
 function startFlow() {
   if (inFlow()) return;
   startOrientation();
-  Object.assign(state, { sides: { front: null, back: null }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: false, editing: false, savedId: null, created: null, name: '', ref: null, price: null, dirty: false, chSide: 'front', idTried: null, idGuess: null });
+  Object.assign(state, { sides: { front: null, back: null }, flags: {}, ai: null, aiPoints: null, useAi: false, demo: false, editing: false, savedId: null, created: null, name: '', ref: null, price: null, dirty: false, chSide: 'front', idTried: null, idGuess: null, idChoices: null });
   openCapture('front');
 }
 $('#start').onclick = startFlow;
